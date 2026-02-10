@@ -36,8 +36,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * Tutorial author: Samuel Thomas, Brown University
  */
 
 #include "mem/abstract_mem.hh"
@@ -61,16 +59,18 @@ namespace memory
 AbstractMemory::AbstractMemory(const Params &p) :
     ClockedObject(p), range(p.range), pmemAddr(NULL),
     backdoor(params().range, nullptr,
-             (MemBackdoor::Flags)(
-                 MemBackdoor::Readable | MemBackdoor::Writeable )),
+             (MemBackdoor::Flags)(p.writeable ?
+                 MemBackdoor::Readable | MemBackdoor::Writeable :
+                 MemBackdoor::Readable)),
     confTableReported(p.conf_table_reported), inAddrMap(p.in_addr_map),
-    kvmMap(p.kvm_map), writeable(true), _system(NULL),
-    stats(*this)
+    kvmMap(p.kvm_map), writeable(p.writeable), collectStats(p.collect_stats),
+    _system(NULL), stats(*this)
 {
     panic_if(!range.valid() || !range.size(),
              "Memory range %s must be valid with non-zero size.",
              range.to_string());
-    // for tutorial :-)
+
+    // for secure memory :-)
     security_metadata = (uint8_t *) malloc(sizeof(uint8_t) * 64);
 }
 
@@ -394,8 +394,6 @@ AbstractMemory::access(PacketPtr pkt)
       return;
     }
 
-    // assert(pkt->getAddrRange().isSubset(range));
-
     uint8_t *host_addr;
     if (pkt->getAddrRange().isSubset(range)) {
         host_addr = toHostAddr(pkt->getAddr());
@@ -441,7 +439,9 @@ AbstractMemory::access(PacketPtr pkt)
 
             assert(!pkt->req->isInstFetch());
             TRACE_PACKET("Read/Write");
-            stats.numOther[pkt->req->requestorId()]++;
+            if (collectStats) {
+                stats.numOther[pkt->req->requestorId()]++;
+            }
         }
     } else if (pkt->isRead()) {
         assert(!pkt->isWrite());
@@ -455,10 +455,13 @@ AbstractMemory::access(PacketPtr pkt)
             pkt->setData(host_addr);
         }
         TRACE_PACKET(pkt->req->isInstFetch() ? "IFetch" : "Read");
-        stats.numReads[pkt->req->requestorId()]++;
-        stats.bytesRead[pkt->req->requestorId()] += pkt->getSize();
-        if (pkt->req->isInstFetch())
-            stats.bytesInstRead[pkt->req->requestorId()] += pkt->getSize();
+        if (collectStats) {
+            stats.numReads[pkt->req->requestorId()]++;
+            stats.bytesRead[pkt->req->requestorId()] += pkt->getSize();
+            if (pkt->req->isInstFetch()) {
+                stats.bytesInstRead[pkt->req->requestorId()] += pkt->getSize();
+            }
+        }
     } else if (pkt->isInvalidate() || pkt->isClean()) {
         assert(!pkt->isWrite());
         // in a fastmem system invalidating and/or cleaning packets
@@ -474,8 +477,10 @@ AbstractMemory::access(PacketPtr pkt)
             }
             assert(!pkt->req->isInstFetch());
             TRACE_PACKET("Write");
-            stats.numWrites[pkt->req->requestorId()]++;
-            stats.bytesWritten[pkt->req->requestorId()] += pkt->getSize();
+            if (collectStats) {
+                stats.numWrites[pkt->req->requestorId()]++;
+                stats.bytesWritten[pkt->req->requestorId()] += pkt->getSize();
+            }
         }
     } else {
         panic("Unexpected packet %s", pkt->print());
@@ -489,7 +494,7 @@ AbstractMemory::access(PacketPtr pkt)
 void
 AbstractMemory::functionalAccess(PacketPtr pkt)
 {
-    // assert(pkt->getAddrRange().isSubset(range));
+    assert(pkt->getAddrRange().isSubset(range));
 
     uint8_t *host_addr = toHostAddr(pkt->getAddr());
 

@@ -295,10 +295,10 @@ TLB::createPagefault(Addr vaddr, BaseMMU::Mode mode)
 }
 
 Addr
-TLB::translateWithTLB(Addr vaddr, uint16_t asid, Addr xmode,
-                      BaseMMU::Mode mode)
+TLB::hiddenTranslateWithTLB(Addr vaddr, uint16_t asid, Addr xmode,
+                            BaseMMU::Mode mode)
 {
-    TlbEntry *e = lookup(getVPNFromVAddr(vaddr, xmode), asid, mode, false);
+    TlbEntry *e = lookup(getVPNFromVAddr(vaddr, xmode), asid, mode, true);
     assert(e != nullptr);
     return e->paddr << PageShift | (vaddr & mask(e->logBytes));
 }
@@ -385,9 +385,9 @@ TLB::translate(const RequestPtr &req, ThreadContext *tc,
         if (fault == NoFault) {
             if (req->getFlags() & Request::PHYSICAL) {
                 /**
-                 * we simply set the virtual address to physical address
+                 * we simply set the virtual address to physical address.
                  */
-                req->setPaddr(req->getVaddr());
+                req->setPaddr(getValidAddr(req->getVaddr(), tc, mode));
             } else {
                 fault = doTranslate(req, tc, translation, mode, delayed);
             }
@@ -418,9 +418,18 @@ TLB::translate(const RequestPtr &req, ThreadContext *tc,
 
         Process * p = tc->getProcessPtr();
 
-        Fault fault = p->pTable->translate(req);
-        if (fault != NoFault)
-            return fault;
+        /*
+         * In RV32 Linux, as vaddr >= 0x80000000 is legal in userspace
+         * (except for COMPAT mode for RV32 Userspace in RV64 Linux), we
+         * need to ignore the upper bits beyond 32 bits.
+         */
+        Addr vaddr = getValidAddr(req->getVaddr(), tc, mode);
+        Addr paddr;
+
+        if (!p->pTable->translate(vaddr, paddr))
+            return std::make_shared<GenericPageTableFault>(req->getVaddr());
+
+        req->setPaddr(paddr);
 
         return NoFault;
     }
@@ -451,7 +460,7 @@ Fault
 TLB::translateFunctional(const RequestPtr &req, ThreadContext *tc,
                          BaseMMU::Mode mode)
 {
-    const Addr vaddr = req->getVaddr();
+    const Addr vaddr = getValidAddr(req->getVaddr(), tc, mode);
     Addr paddr = vaddr;
 
     if (FullSystem) {

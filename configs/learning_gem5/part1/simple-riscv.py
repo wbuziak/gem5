@@ -39,7 +39,7 @@ system.clk_domain.clock = "1GHz"
 system.clk_domain.voltage_domain = VoltageDomain()
 
 system.mem_mode = "timing"
-system.mem_ranges = [AddrRange("512MB")]
+system.mem_ranges = [AddrRange("512MiB")]
 system.cpu = RiscvTimingSimpleCPU()
 
 system.membus = SystemXBar()
@@ -62,12 +62,11 @@ binary = os.path.join(
     "../../../",
     "tests/test-progs/hello/bin/riscv/linux/hello",
 )
-binary = "/home/wbuziak/repos/gem5/progs/binaries/arrflip"
 
 system.workload = SEWorkload.init_compatible(binary)
 
 process = Process()
-process.cmd = [binary, "10000"]
+process.cmd = [binary]
 system.cpu.workload = process
 system.cpu.createThreads()
 

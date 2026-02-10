@@ -52,7 +52,7 @@ PacketQueue::PacketQueue(EventManager& _em, const std::string& _label,
                          bool force_order,
                          bool disable_sanity_check)
     : em(_em), sendEvent([this]{ processSendEvent(); }, _sendEventName),
-      _disableSanityCheck(disable_sanity_check),
+      _disableSanityCheck(true),
       forceOrder(force_order),
       label(_label), waitingOnRetry(false)
 {

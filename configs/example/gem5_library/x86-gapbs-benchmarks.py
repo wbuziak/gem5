@@ -28,7 +28,7 @@
 Script to run GAPBS benchmarks with gem5. The script expects the
 benchmark program and the simulation size to run. The input is in the format
 <benchmark_prog> <size> <synthetic>
-The system is fixed with 2 CPU cores, MESI Two Level system cache and 3 GB
+The system is fixed with 2 CPU cores, MESI Two Level system cache and 3 GiB
 DDR4 memory. It uses the x86 board.
 
 This script will count the total number of instructions executed
@@ -56,6 +56,7 @@ from m5.objects import Root
 
 from gem5.coherence_protocol import CoherenceProtocol
 from gem5.components.boards.x86_board import X86Board
+from gem5.components.memory.secure_ddr4 import MCXSecureMemory
 from gem5.components.memory import DualChannelDDR4_2400
 from gem5.components.processors.cpu_types import CPUTypes
 from gem5.components.processors.simple_switchable_processor import (
@@ -70,7 +71,6 @@ from gem5.utils.requires import requires
 requires(
     isa_required=ISA.X86,
     coherence_protocol_required=CoherenceProtocol.MESI_TWO_LEVEL,
-    kvm_required=True,
 )
 
 parser = argparse.ArgumentParser(
@@ -83,6 +83,8 @@ gapbs_suite = obtain_resource(
 
 # The only positional argument accepted is the benchmark name in this script.
 
+size_choices = ["simsmall", "simmedium", "simlarge"]
+
 parser.add_argument(
     "--benchmark",
     type=str,
@@ -91,8 +93,95 @@ parser.add_argument(
     choices=[workload.get_id() for workload in gapbs_suite],
 )
 
-args = parser.parse_args()
+parser.add_argument(
+    "--size",
+    type=str,
+    required=True,
+    help="Simulation size the benchmark program.",
+    choices=size_choices,
+)
 
+parser.add_argument(
+    "--metadata_cache_size",
+    type=str,
+    required=False,
+    help="Metadata cache size (power of 2 in kB or MB)",
+    default="64kB",
+)
+
+parser.add_argument(
+    "--no_metadata_cache",
+    action="store_true",
+    help="When specified, the input will not use a metadata cache \
+          even when --metadata_cache_size is specified",
+)
+
+parser.add_argument(
+    "--arity",
+    type=int,
+    required=False,
+    help="Integrity tree arity (i.e., how many children share a parent)",
+    default=8,
+)
+
+parser.add_argument(
+    "--encryption_latency",
+    type=int,
+    required=False,
+    default=53,
+    help="Input the encryption latency.",
+)
+
+parser.add_argument(
+    "--cache_mac",
+    action="store_true",
+    help="Should MACs be stored?",
+    default=False,
+)
+
+parser.add_argument(
+    "--eager_fetch",
+    action="store_true",
+    help="Should tree nodes be fetched upon miss detection?",
+    default=False,
+)
+
+parser.add_argument(
+    "--no_bonsai",
+    action="store_true",
+    help="Should the integrity tree implement a merkle tree over \
+            data instead of counters?",
+    default=False,
+)
+
+parser.add_argument(
+    "--l3_size",
+    type=str,
+    required=True,
+    default="1MB",
+    help="L3 size for MCX",
+)
+
+parser.add_argument(
+    "--mcx_policy",
+    type=str,
+    required=True,
+    default="never",
+    choices=[
+        "insecure",
+        "never",
+        "always",
+        "counter",
+        "hotspot",
+        "read-write",
+        "approx-ancestors",
+        "approx-ancestors-v2",
+        "l3-hitrate",
+    ],
+    help="MCX policy",
+)
+
+args = parser.parse_args()
 
 # Setting up all the fixed system parameters here
 # Caches: MESI Two Level Cache Hierarchy
@@ -102,18 +191,27 @@ from gem5.components.cachehierarchies.ruby.mesi_two_level_cache_hierarchy import
 )
 
 cache_hierarchy = MESITwoLevelCacheHierarchy(
-    l1d_size="32kB",
+    l1d_size="32KiB",
     l1d_assoc=8,
-    l1i_size="32kB",
+    l1i_size="32KiB",
     l1i_assoc=8,
-    l2_size="256kB",
+    l2_size="256KiB",
     l2_assoc=16,
     num_l2_banks=2,
 )
-# Memory: Dual Channel DDR4 2400 DRAM device.
-# The X86 board only supports 3 GB of main memory.
 
-memory = DualChannelDDR4_2400(size="3GB")
+memory = MCXSecureMemory(
+    size="16GiB",
+    latency=args.encryption_latency,
+    cache=not args.no_metadata_cache,
+    metadata_cache_size=args.metadata_cache_size,
+    arity=args.arity,
+    cache_mac=args.cache_mac,
+    eager_fetch=args.eager_fetch,
+    bonsai=not args.no_bonsai,
+    l3_cache_size=args.l3_size,
+    protocol=args.mcx_policy,
+)
 
 # Here we setup the processor. This is a special switchable processor in which
 # a starting core type and a switch core type must be specified. Once a
@@ -123,10 +221,10 @@ memory = DualChannelDDR4_2400(size="3GB")
 # cores for the command we wish to run after boot.
 
 processor = SimpleSwitchableProcessor(
-    starting_core_type=CPUTypes.KVM,
+    starting_core_type=CPUTypes.ATOMIC,
     switch_core_type=CPUTypes.TIMING,
     isa=ISA.X86,
-    num_cores=2,
+    num_cores=1,
 )
 
 # Here we setup the board. The X86Board allows for Full-System X86 simulations
@@ -179,7 +277,6 @@ simulator = Simulator(
 globalStart = time.time()
 
 print("Running the simulation")
-print("Using KVM cpu")
 
 # There are a few thihngs to note regarding the gapbs benchamrks. The first is
 # that there are several ROI annotations in the code present in the disk image.

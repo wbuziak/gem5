@@ -1636,6 +1636,13 @@ class Enum(ParamValue, metaclass=MetaEnum):
     def __str__(self):
         return self.value
 
+    def __eq__(self, __o: object) -> bool:
+        """Checks if two enum values are the same."""
+        return type(self) == type(__o) and self.value == __o.value
+
+    def __hash__(self):
+        return hash(self.value)
+
 
 # This param will generate a scoped c++ enum and its python bindings.
 class ScopedEnum(Enum):

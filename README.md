@@ -1,8 +1,7 @@
 # The gem5 Simulator
 
-This is a fork of the official repository for the gem5 simulator (version 24.0.0.1). 
-It contains the full source code for the simulator and all tests and regressions, 
-as well as Secure Memory modules written by Sam Thomas and extended by Will Buziak
+This is the repository for the gem5 simulator. It contains the full source code
+for the simulator and all tests and regressions.
 
 The gem5 simulator is a modular platform for computer-system architecture
 research, encompassing system-level architecture as well as processor
@@ -11,18 +10,21 @@ system software changes, and compile-time and run-time system optimizations.
 
 The main website can be found at <http://www.gem5.org>.
 
+## Testing status
+
+**Note**: These regard tests run on the develop branch of gem5:
+<https://github.com/gem5/gem5/tree/develop>.
+
+[![Daily Tests](https://github.com/gem5/gem5/actions/workflows/daily-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/daily-tests.yaml)
+[![Weekly Tests](https://github.com/gem5/gem5/actions/workflows/weekly-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/weekly-tests.yaml)
+[![Compiler Tests](https://github.com/gem5/gem5/actions/workflows/compiler-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/compiler-tests.yaml)
+
 ## Getting started
 
 A good starting point is <http://www.gem5.org/about>, and for
 more information about building the simulator and getting started
 please see <http://www.gem5.org/documentation> and
 <http://www.gem5.org/documentation/learning_gem5/introduction>.
-
-Note: Since gem5 is an ever-expanding open-source project, much of the documentation
-will be aimed either towards the newest gem5 version, or even perhaps out-dated beyond
-the version in this repository (version 24.0.0.1) and as such, the official
-documentation may, on occassion, be incorrect / unhelpful. Where applicable, relevant
-documentation is provided within README.md for the specified tool.
 
 ## Building gem5
 
@@ -92,6 +94,6 @@ or start discussions. To join the mailing list please visit
 
 ## Contributing to gem5
 
-We hope you enjoy using gem5. When appropriate we advise charing your
+We hope you enjoy using gem5. When appropriate we advise sharing your
 contributions to the project. <https://www.gem5.org/contributing> can help you
 get started. Additional information can be found in the CONTRIBUTING.md file.

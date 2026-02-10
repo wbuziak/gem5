@@ -195,10 +195,6 @@ BaseXBar::Layer<SrcType, DstType>::tryTiming(SrcType* src_port)
     // destination port is already engaged in a transaction waiting
     // for a retry from the peer
     if (state == BUSY || waitingForPeer != NULL) {
-        // the port should not be waiting already
-        assert(std::find(waitingForLayer.begin(), waitingForLayer.end(),
-                         src_port) == waitingForLayer.end());
-
         // put the port at the end of the retry list waiting for the
         // layer to be freed up (and in the case of a busy peer, for
         // that transaction to go through, and then the layer to free
@@ -341,6 +337,11 @@ BaseXBar::findPort(AddrRange addr_range, PacketPtr pkt)
     auto i = portMap.contains(addr_range);
     if (i != portMap.end()) {
         return i->second;
+    }
+
+    if (name().find("to_mem") != std::string::npos) {
+        // this is metadata
+        return (PortID) portMap.size() - 1;
     }
 
     // Check if this matches the default range

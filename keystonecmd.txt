@@ -1,1 +1,0 @@
-./build/RISCV/gem5.opt configs/configs-keystone-default/run_trusted.py ../keystone/build-generic64/buildroot.build/images/fw_jump.elf ../keystone/build-generic64/buildroot.build/images/rootfs.ext2 timing 10 tests/test-progs/hello/bin/riscv/linux/hello

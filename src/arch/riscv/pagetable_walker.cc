@@ -574,8 +574,8 @@ Walker::WalkerState::recvPacket(PacketPtr pkt)
              */
             Addr vaddr = req->getVaddr();
             vaddr = Addr(sext<VADDR_BITS>(vaddr));
-            Addr paddr = walker->tlb->translateWithTLB(vaddr, satp.asid,
-                                                       satp.mode, mode);
+            Addr paddr = walker->tlb->hiddenTranslateWithTLB(vaddr, satp.asid,
+                                                             satp.mode, mode);
             req->setPaddr(paddr);
 
             // do pmp check if any checking condition is met.

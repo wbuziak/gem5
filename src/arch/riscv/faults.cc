@@ -160,7 +160,7 @@ RiscvFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 
         // Set PC to fault handler address
         Addr addr = isa->getFaultHandlerAddr(tvec, _code, isInterrupt());
-        pc_state.set(addr);
+        pc_state.set(isa->rvSext(addr));
         tc->pcState(pc_state);
     } else {
         invokeSE(tc, inst);
@@ -188,13 +188,10 @@ Reset::invoke(ThreadContext *tc, const StaticInstPtr &inst)
     new_pc->vl(0);
     tc->pcState(*new_pc);
 
-    // Reset PMP Cfg
-    auto* mmu = dynamic_cast<RiscvISA::MMU*>(tc->getMMUPtr());
-    if (mmu == nullptr) {
-        warn("MMU is not Riscv MMU instance, we can't reset PMP");
-        return;
+    auto* mmu = tc->getMMUPtr();
+    if (mmu != nullptr) {
+        mmu->reset();
     }
-    mmu->getPMP()->pmpReset();
 }
 
 void

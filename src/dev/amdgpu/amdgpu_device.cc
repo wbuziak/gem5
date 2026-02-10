@@ -58,12 +58,6 @@ AMDGPUDevice::AMDGPUDevice(const AMDGPUDeviceParams &p)
       init_interrupt_count(0), _lastVMID(0),
       deviceMem(name() + ".deviceMem", p.memories, false, "", false)
 {
-    // Loading the rom binary dumped from hardware.
-    std::ifstream romBin;
-    romBin.open(p.rom_binary, std::ios::binary);
-    romBin.read((char *)rom.data(), ROM_SIZE);
-    romBin.close();
-
     // System pointer needs to be explicitly set for device memory since
     // DRAMCtrl uses it to get (1) cache line size and (2) the mem mode.
     // Note this means the cache line size is system wide.
@@ -90,10 +84,6 @@ AMDGPUDevice::AMDGPUDevice(const AMDGPUDeviceParams &p)
         gfx_version = GfxVersion::gfx942;
     } else {
         panic("Unknown GPU device %s\n", p.device_name);
-    }
-
-    if (p.trace_file != "") {
-        mmioReader.readMMIOTrace(p.trace_file);
     }
 
     int sdma_id = 0;
@@ -374,14 +364,27 @@ AMDGPUDevice::readFrame(PacketPtr pkt, Addr offset)
      * because this method is called by the PCIDevice::read method which
      * is a non-timing read.
      */
-    RequestPtr req = std::make_shared<Request>(offset, pkt->getSize(), 0,
-                                               vramRequestorId());
-    PacketPtr readPkt = Packet::createRead(req);
+    RequestPtr req = std::make_shared<Request>(
+            offset, pkt->getSize(), 0, vramRequestorId());
+
+    PacketPtr readPkt = new Packet(req, MemCmd::ReadReq);
     uint8_t *dataPtr = new uint8_t[pkt->getSize()];
     readPkt->dataDynamic(dataPtr);
+    readPkt->req->setGPUFuncAccess(true);
+    readPkt->setSuppressFuncError();
+    cp->shader()->cuList[0]->memPort[0].sendFunctional(readPkt);
+    if (readPkt->cmd == MemCmd::FunctionalReadError) {
+        delete readPkt;
+        delete[] dataPtr;
+        RequestPtr req = std::make_shared<Request>(offset, pkt->getSize(), 0,
+                                               vramRequestorId());
+        PacketPtr readPkt = Packet::createRead(req);
+        uint8_t *dataPtr = new uint8_t[pkt->getSize()];
+        readPkt->dataDynamic(dataPtr);
 
-    auto system = cp->shader()->gpuCmdProc.system();
-    system->getDeviceMemory(readPkt)->access(readPkt);
+        auto system = cp->shader()->gpuCmdProc.system();
+        system->getDeviceMemory(readPkt)->access(readPkt);
+    }
 
     pkt->setUintX(readPkt->getUintX(ByteOrder::little), ByteOrder::little);
     delete readPkt;
@@ -428,8 +431,7 @@ AMDGPUDevice::writeFrame(PacketPtr pkt, Addr offset)
     DPRINTF(AMDGPUDevice, "Wrote framebuffer address %#lx\n", offset);
 
     for (auto& cu: CP()->shader()->cuList) {
-        auto system = CP()->shader()->gpuCmdProc.system();
-        Addr aligned_addr = offset & ~(system->cacheLineSize() - 1);
+        Addr aligned_addr = offset & ~(gpuMemMgr->getCacheLineSize() - 1);
         cu->sendInvL2(aligned_addr);
     }
 
@@ -943,13 +945,13 @@ AMDGPUDevice::deallocatePasid(uint16_t pasid)
 }
 
 void
-AMDGPUDevice::deallocateAllQueues()
+AMDGPUDevice::deallocateAllQueues(bool unmap_static)
 {
     idMap.erase(idMap.begin(), idMap.end());
     usedVMIDs.erase(usedVMIDs.begin(), usedVMIDs.end());
 
     for (auto& it : sdmaEngs) {
-        it.second->deallocateRLCQueues();
+        it.second->deallocateRLCQueues(unmap_static);
     }
 
     // "All" queues implicitly refers to all user queues. User queues begin at

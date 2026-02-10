@@ -183,6 +183,7 @@ enum MiscRegIndex
     MISCREG_SCAUSE,
     MISCREG_STVAL,
     MISCREG_SATP,
+    MISCREG_SENVCFG,
 
     MISCREG_UTVEC,
     MISCREG_USCRATCH,
@@ -360,6 +361,7 @@ enum CSRIndex
     CSR_STVAL = 0x143,
     CSR_SIP = 0x144,
     CSR_SATP = 0x180,
+    CSR_SENVCFG = 0x10A, // 20240411 RISCV spec, volume 2
 
     CSR_MVENDORID = 0xF11,
     CSR_MARCHID = 0xF12,
@@ -777,6 +779,9 @@ const std::unordered_map<int, CSRMetadata> CSRData = {
         {"sip", MISCREG_SIP, rvTypeFlags(RV64, RV32), isaExtsFlags('s')}},
     {CSR_SATP,
         {"satp", MISCREG_SATP, rvTypeFlags(RV64, RV32), isaExtsFlags('s')}},
+    {CSR_SENVCFG,
+        {"senvcfg", MISCREG_SENVCFG, rvTypeFlags(RV64, RV32),
+         isaExtsFlags('s')}},
 
     {CSR_MVENDORID,
         {"mvendorid", MISCREG_VENDORID, rvTypeFlags(RV64, RV32),
@@ -1259,6 +1264,20 @@ BitUnion64(INTERRUPT)
     Bitfield<1> ssi;
     Bitfield<0> usi;
 EndBitUnion(INTERRUPT)
+
+
+// From the RISCV specification version 20240411, volume 2,
+// section 10.1.10, page 98
+BitUnion64(SENVCFG)
+    Bitfield<63,34> wpri_1;
+    Bitfield<33,32> pmm;
+    Bitfield<31,8> wpri_2;
+    Bitfield<7> cbze;
+    Bitfield<6> cbcfe;
+    Bitfield<5,4> cbie;
+    Bitfield<3,1> wpri_3;
+    Bitfield<0> fiom;
+EndBitUnion(SENVCFG)
 
 const off_t MXL_OFFSETS[enums::Num_RiscvType] = {
     [RV32] = (sizeof(uint32_t) * 8 - 2),

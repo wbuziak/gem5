@@ -3,6 +3,7 @@
  * Copyright (c) 2016 The University of Virginia
  * Copyright (c) 2020 Barkhausen Institut
  * Copyright (c) 2022 Google LLC
+ * Copyright (c) 2024 University of Rostock
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -184,6 +185,7 @@ namespace RiscvISA
     [MISCREG_SCAUSE]        = "SCAUSE",
     [MISCREG_STVAL]         = "STVAL",
     [MISCREG_SATP]          = "SATP",
+    [MISCREG_SENVCFG]       = "SENVCFG",
 
     [MISCREG_UTVEC]         = "UTVEC",
     [MISCREG_USCRATCH]      = "USCRATCH",
@@ -258,7 +260,8 @@ RegClass ccRegClass(CCRegClass, CCRegClassName, 0, debug::IntRegs);
 
 ISA::ISA(const Params &p) : BaseISA(p, "riscv"),
     _rvType(p.riscv_type), enableRvv(p.enable_rvv), vlen(p.vlen), elen(p.elen),
-    _privilegeModeSet(p.privilege_mode_set)
+    _privilegeModeSet(p.privilege_mode_set),
+    _wfiResumeOnPending(p.wfi_resume_on_pending), _enableZcd(p.enable_Zcd)
 {
     _regClasses.push_back(&intRegClass);
     _regClasses.push_back(&floatRegClass);
@@ -579,8 +582,7 @@ ISA::readMiscReg(RegIndex idx)
         }
       case MISCREG_VLENB:
         {
-            auto rpc = tc->pcState().as<PCState>();
-            return rpc.vlenb();
+            return getVecLenInBytes();
         }
       case MISCREG_VTYPE:
         {
@@ -776,6 +778,26 @@ ISA::setMiscReg(RegIndex idx, RegVal val)
                     new_val.mode != AddrXlateMode::SV39)
                     new_val.mode = cur_val.mode;
                 setMiscRegNoEffect(idx, new_val);
+            }
+            break;
+          case MISCREG_SENVCFG:
+            {
+                // panic on write to bitfields that aren't implemented in gem5
+                SENVCFG panic_mask = 0;
+                panic_mask.pmm = 3;
+
+                SENVCFG wpri_mask = 0;
+                wpri_mask.wpri_1 = ~wpri_mask.wpri_1;
+                wpri_mask.wpri_2 = ~wpri_mask.wpri_2;
+                wpri_mask.wpri_3 = ~wpri_mask.wpri_3;
+
+                if ((panic_mask & val) != 0) {
+                    panic("Tried to write to an unimplemented bitfield in the "
+                    "senvcfg CSR!\nThe attempted write was:\n %" PRIu64 "\n",
+                    val);
+                }
+
+                setMiscRegNoEffect(idx, val & ~wpri_mask);
             }
             break;
           case MISCREG_TSELECT:

@@ -128,9 +128,8 @@ SimpleMemory::recvTimingReq(PacketPtr pkt)
     // we should not get a new request after committing to retry the
     // current one, but unfortunately the CPU violates this rule, so
     // simply ignore it for now
-    if (retryReq) {
+    if (retryReq)
         return false;
-    }
 
     // if we are busy with a read or write, remember that we have to
     // retry
@@ -238,7 +237,7 @@ Tick
 SimpleMemory::getLatency() const
 {
     return latency +
-        (latency_var ? random_mt.random<Tick>(0, latency_var) : 0);
+        (latency_var ? rng->random<Tick>(0, latency_var) : 0);
 }
 
 void

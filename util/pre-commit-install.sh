@@ -33,11 +33,11 @@ GEM5_ROOT="${DIR}/.."
 
 cd ${GEM5_ROOT}
 
-#if ! command -v pre-commit &> /dev/null
-#then
-#    echo "Cannot find 'pre-commit'. Please ensure all Python requirements are "
-#    echo "installed. This can be done via 'pip install -r requirements.txt'."
-#    exit 1
-#fi
+if ! command -v pre-commit &> /dev/null
+then
+    echo "Cannot find 'pre-commit'. Please ensure all Python requirements are "
+    echo "installed. This can be done via 'pip install -r requirements.txt'."
+    exit 1
+fi
 
-#pre-commit install -t pre-commit -t commit-msg
+pre-commit install -t pre-commit -t commit-msg

@@ -45,13 +45,14 @@ import sys
 import gem5_scons.util
 import SCons.Script
 
-git_style_message = ""
-#You're missing the pre-commit/commit-msg hooks. These hook help to ensure your
-#code follows gem5's style rules on git commit and your commit messages follow
-#our commit message requirements. This script will now install these hooks in
-#your .git/hooks/ directory.
-#Press enter to continue, or ctrl-c to abort:
-#"""
+git_style_message = """
+You're missing the pre-commit/commit-msg hooks. These hook help to ensure your
+code follows gem5's style rules on git commit and your commit messages follow
+our commit message requirements. This script will now install these hooks in
+your .git/hooks/ directory.
+Press enter to continue, or ctrl-c to abort:
+"""
+
 
 def install_style_hooks(env):
     try:
@@ -76,12 +77,12 @@ def install_style_hooks(env):
     print(git_style_message, end=" ")
     if SCons.Script.GetOption("install_hooks"):
         print("Installing revision control hooks automatically.")
-#    else:
-#        try:
-#            input()
-#        except:
-#            print("Input exception, exiting scons.\n")
-#            sys.exit(1)
+    else:
+        try:
+            input()
+        except:
+            print("Input exception, exiting scons.\n")
+            sys.exit(1)
 
     pre_commit_install = env.Dir("#util").File("pre-commit-install.sh")
 
@@ -93,7 +94,7 @@ def install_style_hooks(env):
             "(y/n)?"
         )
         while True:
-#            response = input().lower().strip()
+            response = input().lower().strip()
             if response in {"yes", "ye", "y"}:
                 return
             elif response in {"no", "n"}:

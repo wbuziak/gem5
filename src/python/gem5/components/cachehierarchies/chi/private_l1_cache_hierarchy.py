@@ -36,6 +36,10 @@ from m5.objects import (
 from m5.objects.SubSystem import SubSystem
 
 from gem5.coherence_protocol import CoherenceProtocol
+from gem5.utils.requires import requires
+
+requires(coherence_protocol_required=CoherenceProtocol.CHI)
+
 from gem5.components.boards.abstract_board import AbstractBoard
 from gem5.components.cachehierarchies.abstract_cache_hierarchy import (
     AbstractCacheHierarchy,
@@ -49,7 +53,6 @@ from gem5.components.cachehierarchies.ruby.topologies.simple_pt2pt import (
 from gem5.components.processors.abstract_core import AbstractCore
 from gem5.isas import ISA
 from gem5.utils.override import overrides
-from gem5.utils.requires import requires
 
 from .nodes.directory import SimpleDirectory
 from .nodes.dma_requestor import DMARequestor
@@ -78,9 +81,12 @@ class PrivateL1CacheHierarchy(AbstractRubyCacheHierarchy):
         self._assoc = assoc
 
     @overrides(AbstractCacheHierarchy)
-    def incorporate_cache(self, board: AbstractBoard) -> None:
-        requires(coherence_protocol_required=CoherenceProtocol.CHI)
+    def get_coherence_protocol(self):
+        return CoherenceProtocol.CHI
 
+    @overrides(AbstractCacheHierarchy)
+    def incorporate_cache(self, board: AbstractBoard) -> None:
+        super().incorporate_cache(board)
         self.ruby_system = RubySystem()
 
         # Ruby's global network.
@@ -136,7 +142,9 @@ class PrivateL1CacheHierarchy(AbstractRubyCacheHierarchy):
 
         # Set up a proxy port for the system_port. Used for load binaries and
         # other functional-only things.
-        self.ruby_system.sys_port_proxy = RubyPortProxy()
+        self.ruby_system.sys_port_proxy = RubyPortProxy(
+            ruby_system=self.ruby_system
+        )
         board.connect_system_port(self.ruby_system.sys_port_proxy.in_ports)
 
     def _create_core_cluster(
@@ -166,12 +174,16 @@ class PrivateL1CacheHierarchy(AbstractRubyCacheHierarchy):
         )
 
         cluster.icache.sequencer = RubySequencer(
-            version=core_num, dcache=NULL, clk_domain=cluster.icache.clk_domain
+            version=core_num,
+            dcache=NULL,
+            clk_domain=cluster.icache.clk_domain,
+            ruby_system=self.ruby_system,
         )
         cluster.dcache.sequencer = RubySequencer(
             version=core_num,
             dcache=cluster.dcache.cache,
             clk_domain=cluster.dcache.clk_domain,
+            ruby_system=self.ruby_system,
         )
 
         if board.has_io_bus():
@@ -222,7 +234,11 @@ class PrivateL1CacheHierarchy(AbstractRubyCacheHierarchy):
                 board.get_clock_domain(),
             )
             version = len(board.get_processor().get_cores()) + i
-            ctrl.sequencer = RubySequencer(version=version, in_ports=port)
+            ctrl.sequencer = RubySequencer(
+                version=version,
+                in_ports=port,
+                ruby_system=self.ruby_system,
+            )
             ctrl.sequencer.dcache = NULL
 
             ctrl.ruby_system = self.ruby_system
@@ -233,3 +249,10 @@ class PrivateL1CacheHierarchy(AbstractRubyCacheHierarchy):
             dma_controllers.append(ctrl)
 
         return dma_controllers
+
+    @overrides(AbstractRubyCacheHierarchy)
+    def _reset_version_numbers(self):
+        from .nodes.abstract_node import AbstractNode
+
+        AbstractNode._version = 0
+        MemoryController._version = 0

@@ -113,7 +113,7 @@ MakeInclude('structures/PersistentTable.hh')
 MakeInclude('structures/RubyPrefetcher.hh')
 MakeInclude('structures/RubyPrefetcherProxy.hh')
 MakeInclude('structures/TBEStorage.hh')
-if env['CONF']['PROTOCOL'] == 'CHI':
+if env['CONF']['RUBY_PROTOCOL_CHI']:
     MakeInclude('structures/MN_TBEStorage.hh')
     MakeInclude('structures/MN_TBETable.hh')
 MakeInclude('structures/TBETable.hh')
@@ -129,3 +129,4 @@ MakeInclude('system/Sequencer.hh')
 MakeInclude('system/GPUCoalescer.hh')
 MakeInclude('system/HTMSequencer.hh')
 MakeInclude('system/VIPERCoalescer.hh')
+MakeInclude('system/VIPERSequencer.hh')

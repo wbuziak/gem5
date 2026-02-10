@@ -253,6 +253,10 @@ def define_constants(constants):
     constants.power_tag = "POWER"
     constants.null_tag = "NULL"
     constants.all_compiled_tag = "ALL"
+    constants.null_all_ruby = "NULL_All_Ruby"
+
+    # Need this build in order to run the fs/linux/arm testlib tests.
+    constants.arm_x86_tag = "ARM_X86"
 
     constants.variant_tag_type = "variant"
     constants.opt_tag = "opt"
@@ -267,6 +271,7 @@ def define_constants(constants):
     constants.host_isa_tag_type = "host"
     constants.host_x86_64_tag = "x86_64"
     constants.host_arm_tag = "aarch64"
+    constants.host_gcn_gpu_tag = "gcn_gpu"
 
     constants.kvm_tag = "kvm"
 
@@ -295,6 +300,7 @@ def define_constants(constants):
         constants.host_isa_tag_type: (
             constants.host_x86_64_tag,
             constants.host_arm_tag,
+            constants.host_gcn_gpu_tag,
         ),
     }
 

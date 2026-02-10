@@ -36,19 +36,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from m5.params import *
 from m5.objects.ClockedObject import ClockedObject
+from m5.params import *
+
 
 class AbstractMemory(ClockedObject):
-    type = 'AbstractMemory'
+    type = "AbstractMemory"
     abstract = True
     cxx_header = "mem/abstract_mem.hh"
-    cxx_class = 'gem5::memory::AbstractMemory'
+    cxx_class = "gem5::memory::AbstractMemory"
 
     # A default memory size of 128 MiB (starting at 0) is used to
     # simplify the regressions
-    range = Param.AddrRange('128MiB',
-                            "Address range (potentially interleaved)")
+    range = Param.AddrRange(
+        "128MiB", "Address range (potentially interleaved)"
+    )
     null = Param.Bool(False, "Do not store data, always return zero")
 
     # All memories are passed to the global physical memory, and
@@ -69,15 +71,17 @@ class AbstractMemory(ClockedObject):
 
     # Image file to load into this memory as its initial contents. This is
     # particularly useful for ROMs.
-    image_file = Param.String('',
-            "Image to load into memory as its initial contents")
+    image_file = Param.String(
+        "", "Image to load into memory as its initial contents"
+    )
 
-    # ST: options for integrity protected memory
-    secure_mem = Param.Bool(True, "Do we want to implement secure memory?")
-    metadata_one = Param.Bool(True, "Do we need the first metadata? \
-                                    In Huffmem this means space for queue one")
-    metadata_two = Param.Bool(True, "Do we need the second metadata? \
-                                    In Huffmem this means space for queue two")
-    metadata_three = Param.Bool(True, "Do we need the third metadata? \
-                                    In Huffmem this means space for table")
-    is_pointer = Param.Bool(True, "Is the secure memory pointer chasing?")
+    writeable = Param.Bool(True, "Allow writes to this memory")
+
+    collect_stats = Param.Bool(
+        True,
+        "Collect statistics per requestor for "
+        "each type of access. Set this to `False` if "
+        "requestors may be unknown or when running "
+        "with multiple `System` objects without a "
+        "`SysBridge`.",
+    )

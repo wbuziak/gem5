@@ -111,11 +111,12 @@ class Template:
 
             operands = SubOperandList(self.parser, compositeCode, d.operands)
 
-            myDict[
-                "reg_idx_arr_decl"
-            ] = "RegId srcRegIdxArr[%d]; RegId destRegIdxArr[%d]" % (
-                d.operands.numSrcRegs + d.srcRegIdxPadding,
-                d.operands.numDestRegs + d.destRegIdxPadding,
+            myDict["reg_idx_arr_decl"] = (
+                "RegId srcRegIdxArr[%d]; RegId destRegIdxArr[%d]"
+                % (
+                    d.operands.numSrcRegs + d.srcRegIdxPadding,
+                    d.operands.numDestRegs + d.destRegIdxPadding,
+                )
             )
 
             # The reinterpret casts are largely because an array with a known
@@ -732,6 +733,21 @@ class ISAParser(Grammar):
                 print("namespace %s {" % self.namespace, file=f)
                 if splits > 1:
                     print("#define __SPLIT %u" % i, file=f)
+                # TODO: enable warning for all ISAs
+                if self.namespace == "ArmISAInst":
+                    print(f"#ifdef __clang__", file=f)
+                    print(
+                        f"#pragma clang diagnostic warning "
+                        f'"-Wfloat-conversion"',
+                        file=f,
+                    )
+                    print(
+                        f"#pragma clang diagnostic warning "
+                        f'"-Wimplicit-float-conversion"',
+                        file=f,
+                    )
+                    print(f"#endif", file=f)
+
                 print(f'#include "{fn}"', file=f)
                 print("} // namespace %s" % self.namespace, file=f)
                 print("} // namespace gem5", file=f)
@@ -806,7 +822,7 @@ class ISAParser(Grammar):
         "DBLCOLON",
         "ASTERISK",
         # C preprocessor directives
-        "CPPDIRECTIVE"
+        "CPPDIRECTIVE",
         # The following are matched but never returned. commented out to
         # suppress PLY warning
         # newfile directive

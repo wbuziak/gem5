@@ -47,7 +47,7 @@ from m5.util import fatal
 
 class TestCacheSystem(RubySystem):
     def __init__(self):
-        if buildEnv["PROTOCOL"] != "MSI":
+        if not "RUBY_PROTOCOL_MSI" in buildEnv:
             fatal("This system assumes MSI from learning gem5!")
 
         super().__init__()
@@ -79,6 +79,7 @@ class TestCacheSystem(RubySystem):
                 # I/D cache is combined and grab from ctrl
                 dcache=self.controllers[i].cacheMemory,
                 clk_domain=self.clk_domain,
+                ruby_system=self,
             )
             for i in range(num_testers)
         ]
@@ -95,7 +96,7 @@ class TestCacheSystem(RubySystem):
 
         # Set up a proxy port for the system_port. Used for load binaries and
         # other functional-only things.
-        self.sys_port_proxy = RubyPortProxy()
+        self.sys_port_proxy = RubyPortProxy(ruby_system=self)
         system.system_port = self.sys_port_proxy.in_ports
 
         # Connect up the sequencers to the random tester

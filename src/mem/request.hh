@@ -255,7 +255,10 @@ class Request : public Extensible<Request>
          * These flags are *not* cleared when a Request object is
          * reused (assigned a new address).
          */
-        STICKY_FLAGS = INST_FETCH
+        STICKY_FLAGS = INST_FETCH,
+        /** TLBI_EXT_SYNC_COMP seems to be the largest value
+            of FlagsType, so HAS_NO_ADDR's value is that << 1 */
+        HAS_NO_ADDR                = 0x0001000000000000,
     };
     static const FlagsType STORE_NO_DATA = CACHE_BLOCK_ZERO |
         CLEAN | INVALIDATE;
@@ -470,6 +473,8 @@ class Request : public Extensible<Request>
     /** The cause for HTM transaction abort */
     HtmFailureFaultCause _htmAbortCause = HtmFailureFaultCause::INVALID;
 
+    bool _isGPUFuncAccess;
+
   public:
 
     /**
@@ -490,6 +495,7 @@ class Request : public Extensible<Request>
         _flags.set(flags);
         privateFlags.set(VALID_PADDR|VALID_SIZE);
         _byteEnable = std::vector<bool>(size, true);
+        _isGPUFuncAccess = false;
     }
 
     Request(Addr vaddr, unsigned size, Flags flags,
@@ -499,6 +505,7 @@ class Request : public Extensible<Request>
         setVirt(vaddr, size, flags, id, pc, std::move(atomic_op));
         setContext(cid);
         _byteEnable = std::vector<bool>(size, true);
+        _isGPUFuncAccess = false;
     }
 
     Request(const Request& other)
@@ -1013,6 +1020,7 @@ class Request : public Extensible<Request>
     bool isUncacheable() const { return _flags.isSet(UNCACHEABLE); }
     bool isStrictlyOrdered() const { return _flags.isSet(STRICT_ORDER); }
     bool isInstFetch() const { return _flags.isSet(INST_FETCH); }
+    bool hasNoAddr() const { return _flags.isSet(HAS_NO_ADDR); }
     bool
     isPrefetch() const
     {
@@ -1121,67 +1129,16 @@ class Request : public Extensible<Request>
     bool isCacheMaintenance() const { return _flags.isSet(CLEAN|INVALIDATE); }
     /** @} */
 
-    // Security fields
-    std::vector<Packet*> child_requests;
-    RequestPtr parent = nullptr;
-    RequestPtr other_parent = nullptr;
-    RequestPtr hash_parent = nullptr;
-    bool deleted = false;
+    void
+    setGPUFuncAccess(bool flag) {
+        _isGPUFuncAccess = flag;
+    }
 
-    enum RequestType
+    bool
+    getGPUFuncAccess()
     {
-        MetadataRead,
-        MetadataWrite,
-        MetadataWriteThrough,
-        DataRead,
-        DataWrite,
-        NumRequestTypes
-    };
-
-    bool is_data_returned = false;
-    bool is_counter_fetched = false;
-    bool is_counter_verified = false;
-    bool is_hash_fetched = false;
-    bool is_hash_verified = false;
-    uint64_t arrived = 0;
-    bool sent_to_mem = false;
-    bool metadata_cache_miss = false;
-    bool flexibilitree_hit = false;
-    bool needs_writethrough = false;
-    bool hmac_hit = false;
-
-    int tree_level = -1;
-    uint64_t hash_addr = 0;
-    uint64_t parent_addr = 0;
-
-    RequestType req_type = NumRequestTypes;
-    bool is_metadata() const
-        { return (req_type == MetadataRead ||
-                    req_type == MetadataWrite ||
-                    req_type == MetadataWriteThrough); }
-    uint64_t metadata_addr = 0;
-
-    // Pointer
-    std::vector<uint64_t> ancestor_path;
-
-    // BMF
-    bool is_merge = false;
-
-    // ANUBIS
-    bool is_prefill = false;
-    bool is_shad = false;
-    Packet *replacing = nullptr;
-
-    // BAOBAB
-    uint64_t baobab_ctr = -1;
-    uint64_t baobab_idx[8];
-    bool different_idx = true;
-
-    // HUFFMAN
-    bool is_increment = false;
-    bool is_clear = false;
-    bool is_sort = false;
-    bool is_huffman = false;
+        return _isGPUFuncAccess;
+    }
 };
 
 } // namespace gem5

@@ -552,6 +552,11 @@ for variant_path in variant_paths:
         env.Append(CCFLAGS=['-pipe'])
         env.Append(CCFLAGS=['-fno-strict-aliasing'])
 
+        # Enable -Wall and -Wextra and then disable the few warnings that
+        # we consistently violate
+        env.Append(CCFLAGS=['-Wall', '-Wundef', '-Wextra',
+                            '-Wno-sign-compare', '-Wno-unused-parameter'])
+
         # We always compile using C++17
         env.Append(CXXFLAGS=['-std=c++17'])
 
@@ -604,13 +609,6 @@ for variant_path in variant_paths:
                     env.Append(LINKFLAGS=['-Wl,--no-keep-memory'])
                 else:
                     error("Unable to use --no-keep-memory with the linker")
-
-        # Treat warnings as errors but white list some warnings that we
-        # want to allow (e.g., deprecation warnings).
-        env.Append(CCFLAGS=['-Werror',
-                             '-Wno-error=deprecated-declarations',
-                             '-Wno-error=deprecated',
-                            ])
     else:
         error('\n'.join((
               "Don't know what compiler options to use for your compiler.",

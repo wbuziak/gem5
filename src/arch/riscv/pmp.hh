@@ -37,7 +37,6 @@
 #include "mem/packet.hh"
 #include "params/PMP.hh"
 #include "sim/sim_object.hh"
-#include "mem/mee/secure.hh"
 
 /**
  * @file
@@ -60,10 +59,6 @@ class PMP : public SimObject
   public:
     PARAMS(PMP);
     PMP(const Params &params);
-
-    /** a pointer to a memory encryption engine in order to access ePMP data **/
-
-    SecureEncryptionEngine *mee;
 
   private:
     /** maximum number of entries in the pmp table */
@@ -200,13 +195,6 @@ class PMP : public SimObject
      * @return The A field.
      */
     inline uint8_t pmpGetAField(uint8_t cfg);
-
-    /**
-     * Check the CSR if you need to send to the MEC
-     * (Memory Encryption Engine/Controller) or straight
-     * to the external memory controller
-    **/
-    inline uint8_t pmpGetOField(uint8_t cfg);
 
     /**
      * This function decodes a pmpaddr register value
