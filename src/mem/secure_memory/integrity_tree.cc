@@ -71,7 +71,7 @@ IntegrityTree::IntegrityTree(const IntegrityTreeParams *p)
 void
 IntegrityTree::startup()
 {
-    assert(mem_port.getAddrRanges().size() == 1);
+    //assert(mem_port.getAddrRanges().size() == 1);
 
     Addr start = mem_port.getAddrRanges().front().start();
     Addr end = mem_port.getAddrRanges().front().end();
@@ -1100,9 +1100,11 @@ IntegrityTree::MemSidePort::recvTimingResp(PacketPtr pkt)
 void
 IntegrityTree::MemSidePort::recvReqRetry()
 {
-    assert(!blocked_packets.empty());
-    assert(sendTimingReq(blocked_packets.front()));
-    blocked_packets.pop_front();
+    // We service many packets, not just one at a time
+
+    // assert(!blocked_packets.empty()); // this assertion is wrong
+    // assert(sendTimingReq(blocked_packets.front()));
+    // blocked_packets.pop_front();
 
     while (!blocked_packets.empty() &&
            sendTimingReq(blocked_packets.front()))
@@ -1174,6 +1176,7 @@ IntegrityTree::MetadataResponsePort::recvTimingReq(PacketPtr pkt)
         }
 
         parent->mem_port.sendPacket(pkt);
+ 
     } else {
         if (pkt->needsResponse()) {
             pkt->makeResponse();

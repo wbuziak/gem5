@@ -72,7 +72,7 @@ memory = IntegrityTreeProtectedMemory(
     cache=True,
     cache_size="64KiB",
     cache_mac=True,
-    eager_fetch=True,
+    eager_fetch=False,
     bonsai=True,
 )
 
@@ -95,7 +95,7 @@ board.set_se_binary_workload(
     BinaryResource(
         local_path="/home/wbuziak/repos/grad-research/resources/progs/bin/arrflip"
     ),
-    arguments=["10001 2000000000"], #./arrflip 10001 2000000000
+    arguments=["10001", "2000000000"], #./arrflip 10001 2000000000
 )
 
 # Lastly we run the simulation.

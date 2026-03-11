@@ -60,22 +60,12 @@ from gem5.components.processors.simple_switchable_processor import (
     SimpleSwitchableProcessor,
 )
 from gem5.isas import ISA
-from gem5.resources.resource import (
-  obtain_resource,
-  KernelResource,
-  DiskImageResource,
-  CheckpointResource
-)
+from gem5.resources.resource import obtain_resource
+from gem5.resources.resource import KernelResource
+from gem5.resources.resource import DiskImageResource
 from gem5.simulate.exit_event import ExitEvent
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
-
-# We check for the required gem5 build.
-
-requires(
-    isa_required=ISA.X86,
-    coherence_protocol_required=CoherenceProtocol.MESI_TWO_LEVEL,
-)
 
 # Following are the list of benchmark programs for parsec.
 
@@ -156,7 +146,7 @@ parser.add_argument(
     "--cache_mac",
     action="store_true",
     help="Should MACs be stored?",
-    default=True,
+    default=False,
 )
 
 parser.add_argument(
@@ -174,14 +164,32 @@ parser.add_argument(
     default=False,
 )
 
-parser.add_argument(
-    "--checkpoint-path",
-    type=str,
-    required=False,
-    default="checkpoint/",
-    help="The directory to store the checkpoint.",
-)
-
+#parser.add_argument(
+#    "--l3_size",
+#    type=str,
+#    required=True,
+#    default="1MB",
+#    help="L3 size for MCX",
+#)
+#
+#parser.add_argument(
+#    "--mcx_policy",
+#    type=str,
+#    required=True,
+#    default="never",
+#    choices=[
+#        "insecure",
+#        "never",
+#        "always",
+#        "counter",
+#        "hotspot",
+#        "read-write",
+#        "approx-ancestors",
+#        "approx-ancestors-v2",
+#        "l3-hitrate",
+#    ],
+#    help="MCX policy",
+#)
 
 args = parser.parse_args()
 
@@ -202,14 +210,16 @@ cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
 )
 
 memory = IntegrityTreeProtectedMemory(
-    size="2GiB",
+    size="3GiB",
     latency=args.encryption_latency,
-    arity=args.arity,
     cache=not args.no_metadata_cache,
     cache_size=args.metadata_cache_size,
+    arity=args.arity,
     cache_mac=args.cache_mac,
     eager_fetch=args.eager_fetch,
     bonsai=not args.no_bonsai,
+    #l3_cache_size=args.l3_size,
+    #protocol=args.mcx_policy,
 )
 
 # Here we setup the processor. This is a special switchable processor in which
@@ -223,7 +233,7 @@ processor = SimpleSwitchableProcessor(
     starting_core_type=CPUTypes.ATOMIC,
     switch_core_type=CPUTypes.O3,
     isa=ISA.X86,
-    num_cores=1,
+    num_cores=4,
 )
 
 # for proc in processor.start:
@@ -250,14 +260,10 @@ board = X86Board(
 # Also, we sleep the system for some time so that the output is printed
 # properly.
 
-checkpoint_resource = CheckpointResource(
-  local_path=os.path.join(os.getcwd(), "checkpoint")
-)
 
 command = (
     f"cd /home/gem5/parsec-benchmark;"
     + "source env.sh;"
-    + f"echo 'Starting Benchmark\n---------------\n\n'"
     + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size}         -n 4;"
     + "sleep 5;"
     + "m5 exit;"
@@ -270,9 +276,9 @@ board.set_kernel_disk_workload(
     #kernel=KernelResource(
     #    local_path=os.getcwd() + "/fs_files/vmlinux-4.19.83"
     #),
-     kernel=KernelResource(
-         local_path=os.getcwd() + "/fs_files/vmlinux-5.2.3"
-     ),
+    kernel=KernelResource(
+        local_path=os.getcwd() + "/fs_files/vmlinux-5.2.3"
+    ),
     # The x86-parsec image will be automatically downloaded to the
     # `~/.cache/gem5` directory if not already present.
     disk_image=DiskImageResource(
@@ -285,19 +291,23 @@ board.set_kernel_disk_workload(
 # functions to handle different exit events during the simuation
 def handle_workbegin():
     print("Done booting Linux")
+    print("Resetting stats at the start of ROI!")
+    m5.stats.reset()
+    processor.switch()
+    yield False
 
-    # Save a checkpoint
-    simulator.save_checkpoint(args.checkpoint_path)
-    print(f"Saving checkpoint to {args.checkpoint_path}")
+
+def handle_workend():
+    print("Dump stats at the end of the ROI!")
     m5.stats.dump()
-    yield True 
+    yield True
 
 
 simulator = Simulator(
     board=board,
-    #checkpoint_path=checkpoint_resource,
     on_exit_event={
         ExitEvent.WORKBEGIN: handle_workbegin(),
+        ExitEvent.WORKEND: handle_workend(),
     },
 )
 
@@ -306,6 +316,7 @@ simulator = Simulator(
 globalStart = time.time()
 
 print("Running the simulation")
+print("Using KVM cpu")
 
 m5.stats.reset()
 
@@ -317,14 +328,14 @@ print("All simulation events were successful.")
 # We print the final simulation statistics.
 
 print("Done with the simulation")
-#print()
-#print("Performance statistics:")
+print()
+print("Performance statistics:")
 
-#print("Simulated time in ROI: " + (str(simulator.get_roi_ticks()[0])))
-#print(
-#    "Ran a total of", simulator.get_current_tick() / 1e12, "simulated seconds"
-#)
-#print(
-#    "Total wallclock time: %.2fs, %.2f min"
-#    % (time.time() - globalStart, (time.time() - globalStart) / 60)
-#)
+print("Simulated time in ROI: " + (str(simulator.get_roi_ticks()[0])))
+print(
+    "Ran a total of", simulator.get_current_tick() / 1e12, "simulated seconds"
+)
+print(
+    "Total wallclock time: %.2fs, %.2f min"
+    % (time.time() - globalStart, (time.time() - globalStart) / 60)
+)
