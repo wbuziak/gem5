@@ -74,7 +74,7 @@ IntegrityTree::startup()
     //assert(mem_port.getAddrRanges().size() == 1);
 
     Addr start = mem_port.getAddrRanges().front().start();
-    Addr end = mem_port.getAddrRanges().front().end();
+    Addr end = mem_port.getAddrRanges().back().end();
 
     uint64_t mac_bytes = (end - start) / mac_arity;
     uint64_t level_items;
@@ -146,10 +146,10 @@ IntegrityTree::calculateMacAddress(Addr data_address)
 {
     // get the memory size from the memory device
     AddrRangeList ranges = mem_port.getAddrRanges();
-    assert(ranges.size() == 1);
+    //assert(ranges.size() == 1);
 
     Addr start = ranges.front().start();
-    Addr end = ranges.front().end();
+    Addr end = ranges.back().end();
 
     uint64_t word_idx = (data_address - start) / BLOCK_SIZE;
     uint64_t mac_idx = word_idx / mac_arity;
@@ -162,10 +162,10 @@ IntegrityTree::calculateCounterAddress(Addr data_address)
 {
     // get the memory size from the memory device
     AddrRangeList ranges = mem_port.getAddrRanges();
-    assert(ranges.size() == 1);
+    //assert(ranges.size() == 1);
 
     Addr start = ranges.front().start();
-    Addr end = ranges.front().end();
+    Addr end = ranges.back().end();
 
     uint64_t mac_bytes = (end - start) / mac_arity;
 
@@ -192,7 +192,7 @@ IntegrityTree::calculateParentAddress(Addr meta_addr)
 
     // get the memory size from the memory device
     AddrRangeList ranges = mem_port.getAddrRanges();
-    assert(ranges.size() == 1);
+    //assert(ranges.size() == 1);
 
     assert(integrity_levels.size() >= 3); // mac, counter, data
     if (bonsai) {

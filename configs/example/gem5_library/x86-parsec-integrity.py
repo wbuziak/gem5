@@ -210,7 +210,7 @@ cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
 )
 
 memory = IntegrityTreeProtectedMemory(
-    size="3GiB",
+    size="16GiB",
     latency=args.encryption_latency,
     cache=not args.no_metadata_cache,
     cache_size=args.metadata_cache_size,
