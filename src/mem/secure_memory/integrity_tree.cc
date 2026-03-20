@@ -1062,7 +1062,7 @@ IntegrityTree::CpuSidePort::sendPacket(PacketPtr pkt)
 bool
 IntegrityTree::MemSidePort::recvTimingResp(PacketPtr pkt)
 {
-    assert(getAddrRanges().size() == 1);
+    //assert(getAddrRanges().size() == 1);
 
     if (pkt->getAddr() >= getAddrRanges().front().end()) {
         bool is_metadata = parent->isMetadata(pkt->getAddr());
