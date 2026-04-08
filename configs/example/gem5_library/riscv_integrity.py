@@ -52,8 +52,8 @@ import m5
 from m5.objects import Root
 
 from gem5.coherence_protocol import CoherenceProtocol
-from gem5.components.boards.x86_board import X86Board
-from gem5.components.memory.secure_ddr4 import MCXSecureMemory
+from gem5.components.boards.riscv_board import RiscvBoard
+from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory 
 from gem5.components.memory import DualChannelDDR4_2400
 from gem5.components.processors.cpu_types import CPUTypes
 from gem5.components.processors.simple_switchable_processor import (
@@ -164,32 +164,32 @@ parser.add_argument(
     default=False,
 )
 
-parser.add_argument(
-    "--l3_size",
-    type=str,
-    required=True,
-    default="1MB",
-    help="L3 size for MCX",
-)
-
-parser.add_argument(
-    "--mcx_policy",
-    type=str,
-    required=True,
-    default="never",
-    choices=[
-        "insecure",
-        "never",
-        "always",
-        "counter",
-        "hotspot",
-        "read-write",
-        "approx-ancestors",
-        "approx-ancestors-v2",
-        "l3-hitrate",
-    ],
-    help="MCX policy",
-)
+#parser.add_argument(
+#    "--l3_size",
+#    type=str,
+#    required=True,
+#    default="1MB",
+#    help="L3 size for MCX",
+#)
+#
+#parser.add_argument(
+#    "--mcx_policy",
+#    type=str,
+#    required=True,
+#    default="never",
+#    choices=[
+#        "insecure",
+#        "never",
+#        "always",
+#        "counter",
+#        "hotspot",
+#        "read-write",
+#        "approx-ancestors",
+#        "approx-ancestors-v2",
+#        "l3-hitrate",
+#    ],
+#    help="MCX policy",
+#)
 
 args = parser.parse_args()
 
@@ -209,17 +209,17 @@ cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
     l2_size="128KiB",
 )
 
-memory = MCXSecureMemory(
+memory = IntegrityTreeProtectedMemory(
     size="16GiB",
     latency=args.encryption_latency,
     cache=not args.no_metadata_cache,
-    metadata_cache_size=args.metadata_cache_size,
+    cache_size=args.metadata_cache_size,
     arity=args.arity,
     cache_mac=args.cache_mac,
     eager_fetch=args.eager_fetch,
     bonsai=not args.no_bonsai,
-    l3_cache_size=args.l3_size,
-    protocol=args.mcx_policy,
+    #l3_cache_size=args.l3_size,
+    #protocol=args.mcx_policy,
 )
 
 # Here we setup the processor. This is a special switchable processor in which
@@ -232,7 +232,7 @@ memory = MCXSecureMemory(
 processor = SimpleSwitchableProcessor(
     starting_core_type=CPUTypes.ATOMIC,
     switch_core_type=CPUTypes.O3,
-    isa=ISA.X86,
+    isa=ISA.RISCV,
     num_cores=4,
 )
 
@@ -241,7 +241,7 @@ processor = SimpleSwitchableProcessor(
 
 # Here we setup the board. The X86Board allows for Full-System X86 simulations
 
-board = X86Board(
+board = RiscvBoard(
     clk_freq="3GHz",
     processor=processor,
     memory=memory,
