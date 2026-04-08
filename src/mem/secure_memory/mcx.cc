@@ -496,34 +496,34 @@ namespace gem5::memory {
           }
 
           // reads are sent to memory and decrypted on response
-          //mem_port.sendPacket(pkt);
+          mem_port.sendPacket(pkt);
 
           // request the mac as well
-          //Addr mac_addr = calculateMacAddress(pkt->getAddr());
-          //RequestPtr req = std::make_shared<Request>(
-          //    mac_addr, BLOCK_SIZE, 0, 0
-          //    );
-          //PacketPtr mac_pkt = Packet::createRead(req);
+          Addr mac_addr = calculateMacAddress(pkt->getAddr());
+          RequestPtr req = std::make_shared<Request>(
+              mac_addr, BLOCK_SIZE, 0, 0
+              );
+          PacketPtr mac_pkt = Packet::createRead(req);
 
           // send mac to memory
-          //mac_pkt->allocate();
+          mac_pkt->allocate();
 
-          //if (use_metadata_cache && cache_mac) {
-            // metadata_request_port.sendPacket(mac_pkt);
-          //  sendMetadataToCache(mac_pkt);
-          //} else {
-          //  mem_port.sendPacket(mac_pkt);
+          if (use_metadata_cache && cache_mac) {
+             metadata_request_port.sendPacket(mac_pkt);
+            sendMetadataToCache(mac_pkt);
+          } else {
+            mem_port.sendPacket(mac_pkt);
 
-          //  if (!bonsai) {
-          //    bool success;
-          //    std::tie(std::ignore, success) =
-          //      needs_authentication.emplace(mac_addr, 1);
+            if (!bonsai) {
+              bool success;
+              std::tie(std::ignore, success) =
+                needs_authentication.emplace(mac_addr, 1);
 
-          //    if (!success) {
-          //      needs_authentication[mac_addr]++;
-          //    }
-          //  }
-          //}
+              if (!success) {
+                needs_authentication[mac_addr]++;
+              }
+            }
+          }
           else {
             delete counter_pkt;
             return true;
