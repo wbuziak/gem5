@@ -101,6 +101,8 @@ IntegrityTree::startup()
     integrity_levels.push_front(end); // mac
 
     integrity_levels.shrink_to_fit(); // C++ data structures... meh :/
+
+    secure = 0;
 }
 
 Port&
@@ -261,6 +263,7 @@ IntegrityTree::calculateParentAddress(Addr meta_addr)
 bool
 IntegrityTree::handleRequest(PacketPtr pkt)
 {
+    printf("Secure flag status: %d\n", secure);
     if (cipher_queue.size() == max_cipher_size) {
         return false;
     }
@@ -291,29 +294,31 @@ IntegrityTree::handleRequest(PacketPtr pkt)
             mem_port.sendPacket(pkt);
 
             // request the mac as well
-            Addr mac_addr = calculateMacAddress(pkt->getAddr());
-            RequestPtr req = std::make_shared<Request>(
-                mac_addr, BLOCK_SIZE, 0, 0
-            );
-            PacketPtr mac_pkt = Packet::createRead(req);
+            if (secure) {
+              Addr mac_addr = calculateMacAddress(pkt->getAddr());
+              RequestPtr req = std::make_shared<Request>(
+                  mac_addr, BLOCK_SIZE, 0, 0
+              );
+              PacketPtr mac_pkt = Packet::createRead(req);
 
-            // send mac to memory
-            mac_pkt->allocate();
+              // send mac to memory
+              mac_pkt->allocate();
 
-            if (use_metadata_cache && cache_mac) {
-                metadata_request_port.sendPacket(mac_pkt);
-            } else {
-                mem_port.sendPacket(mac_pkt);
+              if (use_metadata_cache && cache_mac) {
+                  metadata_request_port.sendPacket(mac_pkt);
+              } else {
+                  mem_port.sendPacket(mac_pkt);
 
-                if (!bonsai) {
-                    bool success;
-                    std::tie(std::ignore, success) =
-                        needs_authentication.emplace(mac_addr, 1);
+                  if (!bonsai) {
+                      bool success;
+                      std::tie(std::ignore, success) =
+                          needs_authentication.emplace(mac_addr, 1);
 
-                    if (!success) {
-                        needs_authentication[mac_addr]++;
-                    }
-                }
+                      if (!success) {
+                          needs_authentication[mac_addr]++;
+                      }
+                  }
+               }
             }
         } else {
             delete counter_pkt;
@@ -322,11 +327,13 @@ IntegrityTree::handleRequest(PacketPtr pkt)
     }
 
     // send counter request to memory
-    counter_pkt->allocate();
-    if (use_metadata_cache) {
-        metadata_request_port.sendPacket(counter_pkt);
-    } else {
-        mem_port.sendPacket(counter_pkt);
+    if (secure) {
+      counter_pkt->allocate();
+      if (use_metadata_cache) {
+          metadata_request_port.sendPacket(counter_pkt);
+      } else {
+          mem_port.sendPacket(counter_pkt);
+      }
     }
 
     // stat accounting
@@ -379,6 +386,7 @@ IntegrityTree::handleResponse(PacketPtr pkt)
     assert(pkt->isResponse());
 
     if (pkt->isRead() && !parallelReadAndWrite(pkt)) {
+      if (secure) {
         // check if the counter has returned
         auto ctr_found = counter_fetched.find(pkt->getAddr());
         if (ctr_found != counter_fetched.end()) {
@@ -423,6 +431,7 @@ IntegrityTree::handleResponse(PacketPtr pkt)
             std::tie(std::ignore, success) = awaiting_mac.emplace(pkt);
             assert(success);
         }
+      }
 
         assert(pending_reads.find(pkt->getAddr()) != pending_reads.end());
         pending_reads[pkt->getAddr()]--;

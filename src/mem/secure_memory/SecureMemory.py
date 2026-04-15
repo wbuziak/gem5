@@ -139,6 +139,9 @@ class IntegrityTree(SimObject):
     counter_arity = Param.UInt64(64, "Counter arity")
     mac_arity = Param.UInt64(8, "MAC arity")
 
+    # security?
+    secure = Param.Bool(True, "Perform security?")
+
     # use cache?
     cache = Param.Bool(True, "Use the metadata cache?")
     cache_mac = Param.Bool(False, "Store HMACs in metadata cache?")

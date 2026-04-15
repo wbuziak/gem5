@@ -282,9 +282,12 @@ class IntegrityTree : public SimObject
     // configurable use of metadata cache
     bool use_metadata_cache;
     bool cache_mac;
-
+    
     // configurable notion of when to fetch metadata
     bool eager_fetch;
+    
+    // configurable notion of when to perform security
+    bool secure;
 
     // configurable notion of what kind of tree protection is in place
     bool bonsai;
