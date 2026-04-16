@@ -263,7 +263,6 @@ IntegrityTree::calculateParentAddress(Addr meta_addr)
 bool
 IntegrityTree::handleRequest(PacketPtr pkt)
 {
-    printf("Secure flag status: %d\n", secure);
     if (cipher_queue.size() == max_cipher_size) {
         return false;
     }
@@ -294,6 +293,8 @@ IntegrityTree::handleRequest(PacketPtr pkt)
             mem_port.sendPacket(pkt);
 
             // request the mac as well
+
+            printf("handleRequest - Secure flag status: %d\n", secure);
             if (secure) {
               Addr mac_addr = calculateMacAddress(pkt->getAddr());
               RequestPtr req = std::make_shared<Request>(
@@ -386,6 +387,7 @@ IntegrityTree::handleResponse(PacketPtr pkt)
     assert(pkt->isResponse());
 
     if (pkt->isRead() && !parallelReadAndWrite(pkt)) {
+      printf("handleResponse - secure flag status: %d\n", secure);
       if (secure) {
         // check if the counter has returned
         auto ctr_found = counter_fetched.find(pkt->getAddr());
