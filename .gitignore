@@ -40,3 +40,4 @@ fs_files/*
 riscv-hello-checkpoint/*
 resources/
 results/
+resultsv4/

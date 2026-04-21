@@ -274,7 +274,11 @@ IntegrityTree::handleRequest(PacketPtr pkt)
 
     if (pkt->isWrite()) {
         // need to fetch encryption counter prior to encryption
-        awaiting_counter.emplace(pkt);
+        printf("handleRequest - Write\n");
+        if (secure) {
+          // Only when doing security
+          awaiting_counter.emplace(pkt);
+        }
     } else {
         assert(pkt->isRead());
 
@@ -294,7 +298,7 @@ IntegrityTree::handleRequest(PacketPtr pkt)
 
             // request the mac as well
 
-            printf("handleRequest - Secure flag status: %d\n", secure);
+            printf("handleRequest - Read\n");
             if (secure) {
               Addr mac_addr = calculateMacAddress(pkt->getAddr());
               RequestPtr req = std::make_shared<Request>(
@@ -387,7 +391,7 @@ IntegrityTree::handleResponse(PacketPtr pkt)
     assert(pkt->isResponse());
 
     if (pkt->isRead() && !parallelReadAndWrite(pkt)) {
-      printf("handleResponse - secure flag status: %d\n", secure);
+      printf("handleResponse - Read\n");
       if (secure) {
         // check if the counter has returned
         auto ctr_found = counter_fetched.find(pkt->getAddr());
@@ -444,6 +448,7 @@ IntegrityTree::handleResponse(PacketPtr pkt)
     } else if (pkt->isRead()) {
         // cleanup handled by parallelReadAndWrite... do nothing!
     } else {
+        printf("handleResponse - Write\n");
         assert(pkt->isWrite());
 
         // write responses are just sent to the processor
