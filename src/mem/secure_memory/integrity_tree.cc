@@ -353,6 +353,7 @@ IntegrityTree::handleMetadataCacheMiss(PacketPtr pkt)
     assert(pkt->isRead());
     assert(isMetadata(pkt->getAddr()));
     assert(!isMac(pkt->getAddr()) || cache_mac);
+    assert(secure);
 
     if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1]) {
         // this is a tree node, we need to track the miss
@@ -471,6 +472,7 @@ IntegrityTree::processCounterResponse(PacketPtr pkt)
 bool
 IntegrityTree::handleCounterResponse(PacketPtr pkt)
 {
+    assert(secure);
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -518,6 +520,7 @@ IntegrityTree::handleCounterResponse(PacketPtr pkt)
 bool
 IntegrityTree::handleTreeResponse(PacketPtr pkt)
 {
+    assert(secure);
     if (needs_authentication.find(pkt->getAddr()) !=
         needs_authentication.end())
     {
@@ -636,6 +639,7 @@ IntegrityTree::handleTreeResponse(PacketPtr pkt)
 bool
 IntegrityTree::handleMacResponse(PacketPtr pkt)
 {
+    assert(secure);
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -676,6 +680,7 @@ IntegrityTree::handleMacResponse(PacketPtr pkt)
 bool
 IntegrityTree::initiateCipher(PacketPtr pkt)
 {
+    assert(secure);
     // need to decrypt the data prior to sending to processor
     if (cipher_queue.size() == max_cipher_size) {
         return false;
@@ -720,6 +725,7 @@ IntegrityTree::initiateCipher(PacketPtr pkt)
 bool
 IntegrityTree::initiateMac(PacketPtr pkt)
 {
+    assert(secure);
     // need to decrypt the data prior to sending to processor
     if (hashing_queue.size() == max_mac_size) {
         return false;
@@ -940,7 +946,7 @@ IntegrityTree::parallelReadAndWrite(PacketPtr pkt)
                     schedule(parallelReadRespondEvent, curTick());
                 }
             }
-
+            printf("parallelReadAndWrite - element found in cipher_queue\n");
             found = true;
         }
     }
@@ -967,6 +973,7 @@ IntegrityTree::parallelReadAndWrite(PacketPtr pkt)
                 }
             }
 
+            printf("parallelReadAndWrite - element found in awaiting_counter queue\n");
             found = true;
         }
     }
@@ -1053,6 +1060,8 @@ IntegrityTree::CpuSidePort::sendPacket(PacketPtr pkt)
     blocked_packets.push_back(pkt);
     PacketPtr to_send = blocked_packets.front();
 
+    printf("cpu_side.sendPacket()");
+
     if (sendTimingResp(to_send)) {
         // if this fails, the retry logic is implemented in recvRespRetry
         blocked_packets.pop_front();
@@ -1084,27 +1093,34 @@ IntegrityTree::MemSidePort::recvTimingResp(PacketPtr pkt)
         bool is_metadata = parent->isMetadata(pkt->getAddr());
         bool is_mac = parent->isMac(pkt->getAddr());
 
-        if (is_metadata && !is_mac) {
-            // this is a tree node
-            assert(!is_mac);
-            if (parent->use_metadata_cache) {
-                parent->metadata_response_port.sendPacket(pkt);
-            } else if (parent->bonsai) {
-                assert(parent->handleTreeResponse(pkt));
-            } else {
-                assert(parent->processCounterResponse(pkt));
-            }
-        } else {
-            // this is a mac
-            assert(is_mac);
-            if (parent->cache_mac) {
-                parent->metadata_response_port.sendPacket(pkt);
-            } else if (!parent->bonsai) {
-                assert(parent->handleTreeResponse(pkt));
-            } else {
-                assert(parent->bonsai);
-                assert(parent->handleMacResponse(pkt));
-            }
+        if (parent->secure) {
+          if (is_metadata && !is_mac) {
+              // this is a tree node
+              assert(!is_mac);
+              if (parent->use_metadata_cache) {
+                  parent->metadata_response_port.sendPacket(pkt);
+              } else if (parent->bonsai) {
+                  assert(parent->handleTreeResponse(pkt));
+              } else {
+                  assert(parent->processCounterResponse(pkt));
+              }
+          } else {
+              // this is a mac
+              assert(is_mac);
+              if (parent->cache_mac) {
+                  parent->metadata_response_port.sendPacket(pkt);
+              } else if (!parent->bonsai) {
+                  assert(parent->handleTreeResponse(pkt));
+              } else {
+                  assert(parent->bonsai);
+                  assert(parent->handleMacResponse(pkt));
+              }
+          }
+        } else if (!parent->handleResponse(pkt)) {
+          printf("handleResponse failed - memside.recvTimingResp\n");
+          // We first checked for security, but in the other case
+          // we must still service data packets
+          blocked_responses.push_back(pkt);
         }
     } else if (!parent->handleResponse(pkt)) {
         blocked_responses.push_back(pkt); // data
