@@ -438,6 +438,10 @@ IntegrityTree::handleResponse(PacketPtr pkt)
             std::tie(std::ignore, success) = awaiting_mac.emplace(pkt);
             assert(success);
         }
+      } else {
+            // No security - just send packets to processor
+            assert(awaiting_counter.find(pkt) == awaiting_counter.end());
+            cpu_port.sendPacket(pkt);
       }
 
         assert(pending_reads.find(pkt->getAddr()) != pending_reads.end());
@@ -1060,7 +1064,7 @@ IntegrityTree::CpuSidePort::sendPacket(PacketPtr pkt)
     blocked_packets.push_back(pkt);
     PacketPtr to_send = blocked_packets.front();
 
-    printf("cpu_side.sendPacket()");
+    printf("cpu_side.sendPacket()\n");
 
     if (sendTimingResp(to_send)) {
         // if this fails, the retry logic is implemented in recvRespRetry
