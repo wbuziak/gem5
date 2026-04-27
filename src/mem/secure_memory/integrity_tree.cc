@@ -275,10 +275,7 @@ IntegrityTree::handleRequest(PacketPtr pkt)
     if (pkt->isWrite()) {
         // need to fetch encryption counter prior to encryption
         printf("handleRequest - Write\n");
-        if (secure) {
-          // Only when doing security
-          awaiting_counter.emplace(pkt);
-        }
+        awaiting_counter.emplace(pkt);
     } else {
         assert(pkt->isRead());
 
@@ -983,21 +980,21 @@ IntegrityTree::parallelReadAndWrite(PacketPtr pkt)
     }
 
     if (found) {
-        if (pending_reads.find(pkt->getAddr()) != pending_reads.end()) {
-            pending_reads[pkt->getAddr()]--;
+      if (pending_reads.find(pkt->getAddr()) != pending_reads.end()) {
+          pending_reads[pkt->getAddr()]--;
 
-            if (pending_reads[pkt->getAddr()] == 0) {
-                pending_reads.erase(pkt->getAddr());
-            }
-        } else if (counter_fetched.find(pkt->getAddr()) !=
-                   counter_fetched.end())
-        {
-            counter_fetched[pkt->getAddr()]--;
+          if (pending_reads[pkt->getAddr()] == 0) {
+            pending_reads.erase(pkt->getAddr());
+          }
+      } else if (counter_fetched.find(pkt->getAddr()) !=
+          counter_fetched.end())
+      {
+          counter_fetched[pkt->getAddr()]--;
 
-            if (counter_fetched[pkt->getAddr()] == 0) {
-                counter_fetched.erase(pkt->getAddr());
-            }
-        }
+          if (counter_fetched[pkt->getAddr()] == 0) {
+              counter_fetched.erase(pkt->getAddr());
+          }
+      }
     }
 
     return found;
