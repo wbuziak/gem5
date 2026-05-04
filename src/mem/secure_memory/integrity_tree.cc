@@ -273,9 +273,14 @@ IntegrityTree::handleRequest(PacketPtr pkt)
     PacketPtr counter_pkt = Packet::createRead(req);
 
     if (pkt->isWrite()) {
-        // need to fetch encryption counter prior to encryption
         printf("handleRequest - Write\n");
-        awaiting_counter.emplace(pkt);
+        if (secure) {
+          // need to fetch encryption counter prior to encryption
+          awaiting_counter.emplace(pkt);
+        } else {
+          // Simply forward the write to memory
+          mem_port.sendPacket(pkt);
+        }
     } else {
         assert(pkt->isRead());
 
@@ -451,21 +456,6 @@ IntegrityTree::handleResponse(PacketPtr pkt)
     } else {
         printf("handleResponse - Write\n");
         assert(pkt->isWrite());
-
-        // Delete pkt from awaiting_counter
-        if (!secure) {
-          for (auto it = awaiting_counter.begin();
-              it != awaiting_counter.end();)
-          {
-            // may need to check for equality to (*it)->getAddr() too
-            if (calculateCounterAddress((*it)->getAddr()) == pkt->getAddr()) {
-              printf("deleting member from awaiting_counter in handleResponse\n");
-              it = awaiting_counter.erase(it);
-            }
-
-            ++it;
-          }
-        }
 
         // write responses are just sent to the processor
         assert(awaiting_counter.find(pkt) == awaiting_counter.end());
