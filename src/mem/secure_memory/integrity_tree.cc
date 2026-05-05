@@ -273,7 +273,6 @@ IntegrityTree::handleRequest(PacketPtr pkt)
     PacketPtr counter_pkt = Packet::createRead(req);
 
     if (pkt->isWrite()) {
-        printf("handleRequest - Write\n");
         if (secure) {
           // need to fetch encryption counter prior to encryption
           awaiting_counter.emplace(pkt);
@@ -300,7 +299,6 @@ IntegrityTree::handleRequest(PacketPtr pkt)
 
             // request the mac as well
 
-            printf("handleRequest - Read\n");
             if (secure) {
               Addr mac_addr = calculateMacAddress(pkt->getAddr());
               RequestPtr req = std::make_shared<Request>(
@@ -394,7 +392,6 @@ IntegrityTree::handleResponse(PacketPtr pkt)
     assert(pkt->isResponse());
 
     if (pkt->isRead() && !parallelReadAndWrite(pkt)) {
-      printf("handleResponse - Read\n");
       if (secure) {
         // check if the counter has returned
         auto ctr_found = counter_fetched.find(pkt->getAddr());
@@ -454,7 +451,6 @@ IntegrityTree::handleResponse(PacketPtr pkt)
     } else if (pkt->isRead()) {
         // cleanup handled by parallelReadAndWrite... do nothing!
     } else {
-        printf("handleResponse - Write\n");
         assert(pkt->isWrite());
 
         // write responses are just sent to the processor
@@ -951,7 +947,6 @@ IntegrityTree::parallelReadAndWrite(PacketPtr pkt)
                     schedule(parallelReadRespondEvent, curTick());
                 }
             }
-            printf("parallelReadAndWrite - element found in cipher_queue\n");
             found = true;
         }
     }
@@ -978,7 +973,6 @@ IntegrityTree::parallelReadAndWrite(PacketPtr pkt)
                 }
             }
 
-            printf("parallelReadAndWrite - element found in awaiting_counter queue\n");
             found = true;
         }
     }
@@ -1065,7 +1059,6 @@ IntegrityTree::CpuSidePort::sendPacket(PacketPtr pkt)
     blocked_packets.push_back(pkt);
     PacketPtr to_send = blocked_packets.front();
 
-    printf("cpu_side.sendPacket()\n");
 
     if (sendTimingResp(to_send)) {
         // if this fails, the retry logic is implemented in recvRespRetry
@@ -1122,7 +1115,6 @@ IntegrityTree::MemSidePort::recvTimingResp(PacketPtr pkt)
               }
           }
         } else if (!parent->handleResponse(pkt)) {
-          printf("handleResponse failed - memside.recvTimingResp\n");
           // We first checked for security, but in the other case
           // we must still service data packets
           blocked_responses.push_back(pkt);
