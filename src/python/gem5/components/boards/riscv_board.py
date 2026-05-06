@@ -250,23 +250,10 @@ class RiscvBoard(AbstractSystemBoard, KernelDiskWorkload, SEBinaryWorkload):
 
     @overrides(AbstractSystemBoard)
     def _setup_memory_ranges(self):
-        memory = self.get_memory()
-        mem_size = memory.get_size()
-        self.mem_ranges = [AddrRange(start=0x80000000, size=mem_size)]
-        memory.set_memory_range(self.mem_ranges)
-
-        #data_range1 = AddrRange(toMemorySize("3GiB"))
-        #remaining_size = memory.get_size() - toMemorySize("3GiB")
- 
-        #data_range2 = AddrRange(
-        #        0xFFFF0000,
-        #        size=remaining_size
-        #)
-
-        #memory.set_memory_range([data_range1, data_range2])
-        # memory.set_memory_range([data_range2])
-
-
+            memory = self.get_memory()
+            mem_size = memory.get_size()
+            self.mem_ranges = [AddrRange(start=0x80000000, size=mem_size)]
+            memory.set_memory_range(self.mem_ranges)
 
     def generate_device_tree(self, outdir: str) -> None:
         """Creates the ``dtb`` and ``dts`` files.

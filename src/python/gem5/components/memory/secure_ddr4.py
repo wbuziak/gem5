@@ -95,21 +95,24 @@ class SecureDDR4(AbstractMemorySystem):
 
         super().__init__()
 
-        if toMemorySize(size) > toMemorySize("3GiB"):
-            assert size[-3:] == "GiB"
-            #assert secure_memory_class == MCX
-            remaining_size = str(int(size[:-3]) - 3) + "GiB"
-            self._dram = [
-                    DDR4_2400_8x8(device_size = "3GiB"),
-                    DDR4_2400_8x8(device_size = remaining_size),
-            ]
-            self.mem_ctrl = [
-                    MemCtrl(dram=self._dram[0]),
-                    MemCtrl(dram=self._dram[1]),
-            ]
-        else:
-            self._dram = [DDR4_2400_8x8(device_size=size)]
-            self.mem_ctrl = [MemCtrl(dram=self._dram[0])]
+        #if toMemorySize(size) > toMemorySize("3GiB"):
+        #    assert size[-3:] == "GiB"
+        #    #assert secure_memory_class == MCX
+        #    remaining_size = str(int(size[:-3]) - 3) + "GiB"
+        #    self._dram = [
+        #            DDR4_2400_8x8(device_size = "3GiB"),
+        #            DDR4_2400_8x8(device_size = remaining_size),
+        #    ]
+        #    self.mem_ctrl = [
+        #            MemCtrl(dram=self._dram[0]),
+        #            MemCtrl(dram=self._dram[1]),
+        #    ]
+        #else:
+
+        # For RISC-V, we just have one address space
+        # For X86, comment out the code block above 
+        self._dram = [DDR4_2400_8x8(device_size=size)]
+        self.mem_ctrl = [MemCtrl(dram=self._dram[0])]
 
         self._size = toMemorySize(size)
 
@@ -205,16 +208,17 @@ class SecureDDR4(AbstractMemorySystem):
 
     @overrides(AbstractMemorySystem)
     def set_memory_range(self, ranges: List[AddrRange]) -> None:
-        if len(ranges) != 1:
+        #if len(ranges) != 1:
             # raise Exception(
             #     "Secure memory controller requires a single "
             #     "range which matches the memory's size. Too naughty for words!"
             # )
-            assert len(ranges) == 2
-            self._dram[0].range = ranges[0]
-            self._dram[1].range = ranges[1]
-        else:
-            self._dram[0].range = ranges[0]
+       #     assert len(ranges) == 2
+       #     self._dram[0].range = ranges[0]
+       #     self._dram[1].range = ranges[1]
+       # else:
+       # For X86, comment out the code block above
+       self._dram[0].range = ranges[0]
 
 
 def DirectEncryptedMemory(

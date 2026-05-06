@@ -50,6 +50,7 @@ scons build/X86/gem5.opt
 import argparse
 import sys
 import time
+import os
 
 import m5
 from m5.objects import Root
@@ -59,15 +60,21 @@ from gem5.components.cachehierarchies.classic.private_l1_private_l2_cache_hierar
     PrivateL1PrivateL2CacheHierarchy,
 )
 from gem5.components.boards.riscv_board import RiscvBoard
-from gem5.components.memory.secure_ddr4 import MCXSecureMemory
+from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory
 from gem5.components.memory.secure_ddr4 import DirectEncryptedMemory
 from gem5.components.memory import DualChannelDDR4_2400
 from gem5.components.processors.cpu_types import CPUTypes
 from gem5.components.processors.simple_switchable_processor import (
     SimpleSwitchableProcessor,
 )
+
+from gem5.resources.resource import (
+    KernelResource,
+    DiskImageResource,
+    BootloaderResource
+)
+
 from gem5.isas import ISA
-from gem5.resources.resource import obtain_resource
 from gem5.simulate.exit_event import ExitEvent
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
@@ -76,20 +83,18 @@ parser = argparse.ArgumentParser(
     description="An example configuration script to run the gapbs benchmarks."
 )
 
-gapbs_suite = obtain_resource(
-    "gapbs-benchmark-suite", resource_version="1.0.0"
-)
-
 # The only positional argument accepted is the benchmark name in this script.
 
 size_choices = ["simsmall", "simmedium", "simlarge"]
+
+benchmarks = ["bfs"]
 
 parser.add_argument(
     "--benchmark",
     type=str,
     required=True,
     help="Input the benchmark program to execute.",
-    choices=[workload.get_id() for workload in gapbs_suite],
+    choices=benchmarks,
 )
 
 parser.add_argument(
@@ -153,33 +158,6 @@ parser.add_argument(
     default=False,
 )
 
-parser.add_argument(
-    "--l3_size",
-    type=str,
-    required=True,
-    default="1MB",
-    help="L3 size for MCX",
-)
-
-parser.add_argument(
-    "--mcx_policy",
-    type=str,
-    required=True,
-    default="never",
-    choices=[
-        "insecure",
-        "never",
-        "always",
-        "counter",
-        "hotspot",
-        "read-write",
-        "approx-ancestors",
-        "approx-ancestors-v2",
-        "l3-hitrate",
-    ],
-    help="MCX policy",
-)
-
 args = parser.parse_args()
 
 cache_hierarchy = PrivateL1PrivateL2CacheHierarchy(
@@ -188,17 +166,15 @@ cache_hierarchy = PrivateL1PrivateL2CacheHierarchy(
     l2_size="128KiB",
 )
 
-memory = MCXSecureMemory(
+memory = IntegrityTreeProtectedMemory(
     size="16GiB",
     latency=args.encryption_latency,
     cache=not args.no_metadata_cache,
-    metadata_cache_size=args.metadata_cache_size,
+    cache_size=args.metadata_cache_size,
     arity=args.arity,
     cache_mac=args.cache_mac,
     eager_fetch=args.eager_fetch,
     bonsai=not args.no_bonsai,
-    l3_cache_size=args.l3_size,
-    protocol=args.mcx_policy,
 )
 
 # Here we setup the processor. This is a special switchable processor in which
@@ -212,7 +188,7 @@ processor = SimpleSwitchableProcessor(
     starting_core_type=CPUTypes.ATOMIC,
     switch_core_type=CPUTypes.TIMING,
     isa=ISA.RISCV,
-    num_cores=1,
+    num_cores=4,
 )
 
 # Here we setup the board. The X86Board allows for Full-System X86 simulations
@@ -233,7 +209,28 @@ board = RiscvBoard(
 # committed instructions till ROI ends (marked by `workend`). We then finish
 # executing the rest of the benchmark.
 
-board.set_workload(obtain_resource(args.benchmark))
+command = (
+    f"ls;"
+    + "cd;"
+    + "ls;"
+    + "sleep 5;"
+    + "m5 exit;"
+)
+
+board.set_kernel_disk_workload(
+    bootloader=BootloaderResource(
+        local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"
+    ),
+    kernel=KernelResource(
+        local_path=os.getcwd() + "/fs_files/linux-kernel-6.5.5"
+    ),
+    # The x86-parsec image will be automatically downloaded to the
+    # `~/.cache/gem5` directory if not already present.
+    disk_image=DiskImageResource(
+        local_path=os.getcwd() + "/fs_files/riscv-ubuntu-20.04"
+    ),
+    readfile_contents=command,
+)
 
 def handle_workbegin():
     print("Done booting Linux")
