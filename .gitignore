@@ -40,3 +40,7 @@ fs_files/*
 riscv-hello-checkpoint/*
 resources/
 results/
+<<<<<<< Updated upstream
+=======
+resultsv4/
+>>>>>>> Stashed changes
