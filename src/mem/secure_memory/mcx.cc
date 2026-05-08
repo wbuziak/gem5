@@ -466,7 +466,7 @@ namespace gem5::memory {
 
         total_distances /= recent_accesses_buffer.size();
 
-        distance_level = integrity_levels.size() - 1;
+       distance_level = integrity_levels.size() - 1;
         Addr region_size = 4096;
         while (region_size < total_distances && distance_level > 1) {
           distance_level--;
@@ -496,34 +496,34 @@ namespace gem5::memory {
           }
 
           // reads are sent to memory and decrypted on response
-          mem_port.sendPacket(pkt);
+          //mem_port.sendPacket(pkt);
 
           // request the mac as well
-          Addr mac_addr = calculateMacAddress(pkt->getAddr());
-          RequestPtr req = std::make_shared<Request>(
-              mac_addr, BLOCK_SIZE, 0, 0
-              );
-          PacketPtr mac_pkt = Packet::createRead(req);
+          //Addr mac_addr = calculateMacAddress(pkt->getAddr());
+          //RequestPtr req = std::make_shared<Request>(
+          //    mac_addr, BLOCK_SIZE, 0, 0
+          //    );
+          //PacketPtr mac_pkt = Packet::createRead(req);
 
           // send mac to memory
-          mac_pkt->allocate();
+          //mac_pkt->allocate();
 
-          if (use_metadata_cache && cache_mac) {
-             metadata_request_port.sendPacket(mac_pkt);
-            sendMetadataToCache(mac_pkt);
-          } else {
-            mem_port.sendPacket(mac_pkt);
+          //if (use_metadata_cache && cache_mac) {
+            // metadata_request_port.sendPacket(mac_pkt);
+          //  sendMetadataToCache(mac_pkt);
+          //} else {
+          //  mem_port.sendPacket(mac_pkt);
 
-            if (!bonsai) {
-              bool success;
-              std::tie(std::ignore, success) =
-                needs_authentication.emplace(mac_addr, 1);
+          //  if (!bonsai) {
+          //    bool success;
+          //    std::tie(std::ignore, success) =
+          //      needs_authentication.emplace(mac_addr, 1);
 
-              if (!success) {
-                needs_authentication[mac_addr]++;
-              }
-            }
-          }
+          //    if (!success) {
+          //      needs_authentication[mac_addr]++;
+          //    }
+          //  }
+          //}
           else {
             delete counter_pkt;
             return true;
@@ -851,7 +851,7 @@ namespace gem5::memory {
           it != awaiting_mac.end();)
       {
         if (calculateMacAddress((*it)->getAddr()) == pkt->getAddr()) {
-          // something was waiting on this counter to do the cipher
+          // something was waiti on this counter to do the cipher
           // try sending it for en/decryption
           if (!initiateMac(*it)) {
             // the queue was full, move to pending state (with priority)
@@ -969,7 +969,7 @@ namespace gem5::memory {
       } else {
         mem_port.sendPacket(counter_pkt); // send counter to memory
       }
-
+      
       // make parent packets
       Addr addr = bonsai ? ctr_addr : mac_addr;
       do {
@@ -1328,9 +1328,8 @@ namespace gem5::memory {
 
       bool is_metadata = parent->isMetadata(pkt->getAddr());
       if (is_metadata) {
-        bool is_mac = parent->isMac(pkt->getAddr());
-
-        if (!is_mac || (is_mac && parent->cache_mac)) {
+         bool is_mac = parent->isMac(pkt->getAddr());
+         if (!is_mac || (is_mac && parent->cache_mac)) {
           // this is a tree node
           if (parent->use_metadata_cache) {
             if (parent->awaiting_mc_resp.find(pkt->getAddr()) != parent->awaiting_mc_resp.end()) {
