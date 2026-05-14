@@ -56,8 +56,8 @@ import m5
 from m5.objects import Root
 
 from gem5.coherence_protocol import CoherenceProtocol
-from gem5.components.cachehierarchies.classic.private_l1_private_l2_cache_hierarchy import (
-    PrivateL1PrivateL2CacheHierarchy,
+from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarchy import (
+    PrivateL1SharedL2CacheHierarchy,
 )
 from gem5.components.boards.riscv_board import RiscvBoard
 from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory
@@ -160,7 +160,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-cache_hierarchy = PrivateL1PrivateL2CacheHierarchy(
+cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
     l1d_size="32KiB",
     l1i_size="32KiB",
     l2_size="128KiB",
@@ -186,7 +186,7 @@ memory = IntegrityTreeProtectedMemory(
 
 processor = SimpleSwitchableProcessor(
     starting_core_type=CPUTypes.ATOMIC,
-    switch_core_type=CPUTypes.TIMING,
+    switch_core_type=CPUTypes.O3,
     isa=ISA.RISCV,
     num_cores=4,
 )
@@ -236,9 +236,8 @@ def handle_workbegin():
     print("Done booting Linux")
     print("Resetting stats at the start of ROI!")
     m5.stats.reset()
-    global start_tick
-    start_tick = m5.curTick()
     processor.switch()
+    simulator.schedule_max_insts(500000000 / 4) # 500 million instructions
     yield False  # E.g., continue the simulation.
 
 
@@ -262,29 +261,20 @@ globalStart = time.time()
 
 print("Running the simulation")
 
-# There are a few thihngs to note regarding the gapbs benchamrks. The first is
-# that there are several ROI annotations in the code present in the disk image.
-# These ROI begin and end calls are inside a loop. Therefore, we only simulate
-# the first ROI annotation in details. The X86Board currently does not support
-#  `work items started count reached`.
+m5.stats.reset()
 
+# We start the simulation
 simulator.run()
-end_tick = m5.curTick()
-# Since we simulated the ROI in details, therefore, simulation is over at this
-# point.
 
-# Simulation is over at this point. We acknowledge that all the simulation
-# events were successful.
 print("All simulation events were successful.")
 
 # We print the final simulation statistics.
+
 print("Done with the simulation")
 print()
 print("Performance statistics:")
 
-print(
-    f"Simulated time in ROI: {(end_tick - start_tick) / 1000000000000.0:.2f}s"
-)
+print("Simulated time in ROI: " + (str(simulator.get_roi_ticks()[0])))
 print(
     "Ran a total of", simulator.get_current_tick() / 1e12, "simulated seconds"
 )
