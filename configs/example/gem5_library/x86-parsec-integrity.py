@@ -294,7 +294,7 @@ def handle_workbegin():
     print("Resetting stats at the start of ROI!")
     m5.stats.reset()
     processor.switch()
-    simulator.schedule_max_insts(500000000 / num_cores) # 500 million instructions
+    simulator.schedule_max_insts(500000000 / 4) # 500 million instructions
     yield False
 
 
