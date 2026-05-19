@@ -186,12 +186,12 @@ class SecureDDR4(AbstractMemorySystem):
 
     @overrides(AbstractMemorySystem)
     def get_mem_ports(self) -> Sequence[Tuple[AddrRange, Port]]:
-        #to_return = [ (self._dram[0].range, self.secure_memory.cpu_side0) ]
-        to_return = [ (self._dram[0].range, self.secure_memory.cpu_side ) ]
+        to_return = [ (self._dram[0].range, self.secure_memory.cpu_side0) ]
+        #to_return = [ (self._dram[0].range, self.secure_memory.cpu_side ) ]
 
-        #if len(self.mem_ctrl) > 1:
-        #    assert len(self.mem_ctrl) == 2
-        #    to_return.append(( self._dram[1].range, self.secure_memory.cpu_side1 ))
+        if len(self.mem_ctrl) > 1:
+            assert len(self.mem_ctrl) == 2
+            to_return.append(( self._dram[1].range, self.secure_memory.cpu_side1 ))
 
         return to_return
 
