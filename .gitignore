@@ -39,4 +39,3 @@ nohup.out
 fs_files/*
 riscv-hello-checkpoint/*
 resources/
-results/
