@@ -1,0 +1,4 @@
+cd /home/gem5/parsec-benchmark;source env.sh;echo 'Starting Benchmark
+---------------
+
+'parsecmgmt -a run -p fluidanimate -c gcc-hooks -i simlarge         -n 4;sleep 5;m5 exit;
