@@ -54,7 +54,8 @@ from m5.objects import Root
 from gem5.coherence_protocol import CoherenceProtocol
 from gem5.components.boards.x86_board import X86Board
 from gem5.components.memory.secure_ddr4 import ConfigurableMemory 
-from gem5.components.memory import DualChannelDDR4_2400
+from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory
+from gem5.components.memory.multi_channel import DualChannelDDR3_1600
 from gem5.components.processors.cpu_types import CPUTypes
 from gem5.components.processors.simple_switchable_processor import (
     SimpleSwitchableProcessor,
@@ -85,6 +86,14 @@ benchmark_choices = [
     "x264",
 ]
 
+# Memory module choices
+
+memory_choices = [
+    "configurable",
+    "integrity_tree",
+    "no_security",
+]
+
 # Following are the input size.
 
 size_choices = ["simsmall", "simmedium", "simlarge"]
@@ -101,6 +110,14 @@ parser.add_argument(
     required=True,
     help="Input the benchmark program to execute.",
     choices=benchmark_choices,
+)
+
+parser.add_argument(
+    "--memory",
+    type=str,
+    required=True,
+    help="Input the memory module to run.",
+    choices=memory_choices,
 )
 
 parser.add_argument(
@@ -203,24 +220,45 @@ from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarc
 # Memory: Dual Channel DDR4 2400 DRAM device.
 # The X86 board only supports 3 GiB of main memory.
 
+
 cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
     l1d_size="32KiB",
     l1i_size="32KiB",
     l2_size="128KiB",
 )
 
-memory = ConfigurableMemory(
-    size="16GiB",
-    latency=args.encryption_latency,
-    cache=not args.no_metadata_cache,
-    cache_size=args.metadata_cache_size,
-    arity=args.arity,
-    cache_mac=args.cache_mac,
-    eager_fetch=args.eager_fetch,
-    bonsai=not args.no_bonsai,
-    #l3_cache_size=args.l3_size,
-    #protocol=args.mcx_policy,
-)
+print(f"\nRunning memory module: {args.memory}\n")
+
+if (args.memory == "configurable"):
+    memory = ConfigurableMemory(
+        size="16GiB",
+        latency=args.encryption_latency,
+        cache=not args.no_metadata_cache,
+        cache_size=args.metadata_cache_size,
+        arity=args.arity,
+        cache_mac=args.cache_mac,
+        eager_fetch=args.eager_fetch,
+        bonsai=not args.no_bonsai,
+        #l3_cache_size=args.l3_size,
+        #protocol=args.mcx_policy,
+    )
+elif (args.memory == "integrity_tree"):
+    memory = IntegrityTreeProtectedMemory(
+        size="16GiB",
+        latency=args.encryption_latency,
+        cache=not args.no_metadata_cache,
+        cache_size=args.metadata_cache_size,
+        arity=args.arity,
+        cache_mac=args.cache_mac,
+        eager_fetch=args.eager_fetch,
+        bonsai=not args.no_bonsai,
+        #l3_cache_size=args.l3_size,
+        #protocol=args.mcx_policy,
+    )
+else:
+    memory = DualChannelDDR3_1600(
+        size="16GiB",
+    )
 
 # Here we setup the processor. This is a special switchable processor in which
 # a starting core type and a switch core type must be specified. Once a
