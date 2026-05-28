@@ -56,6 +56,7 @@ from m5.objects import (
     CounterModeEncryption,
     DirectEncryption,
     IntegrityTree,
+    Configurable,
     L2XBar,
     MemCtrl,
     Port,
@@ -126,6 +127,14 @@ class SecureDDR4(AbstractMemorySystem):
                 )
             elif secure_memory_class == IntegrityTree:
                 self.secure_memory = IntegrityTree(
+                    latency=latency,
+                    tree_arity=arity,
+                    cache_mac=ch,
+                    eager_fetch=ef,
+                    bonsai=bonsai,
+                )
+            elif secure_memory_class == Configurable:
+                self.secure_memory = Configurable(
                     latency=latency,
                     tree_arity=arity,
                     cache_mac=ch,
@@ -285,6 +294,28 @@ def IntegrityTreeProtectedMemory(
         bonsai=bonsai,
     )
 
+def ConfigurableMemory(
+    size: Optional[str] = "32MB",
+    latency: Optional[int] = 53,
+    arity: Optional[int] = 64,
+    cache: Optional[bool] = True,
+    cache_size: Optional[str] = "64KiB",
+    cache_mac: Optional[bool] = False,
+    eager_fetch: Optional[bool] = True,
+    bonsai: Optional[bool] = True,
+) -> AbstractMemorySystem:
+    # arity describes counter arity (number of data blocks per counter block)
+    return SecureDDR4(
+        Configurable,
+        size=size,
+        latency=latency,
+        arity=arity,
+        cache=cache,
+        cache_size=cache_size,
+        ch=cache_mac,
+        ef=eager_fetch,
+        bonsai=bonsai,
+    )
 
 def MCXSecureMemory(
     size: Optional[str] = "32MB",
