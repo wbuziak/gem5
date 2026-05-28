@@ -92,6 +92,7 @@ memory_choices = [
     "configurable",
     "integrity_tree",
     "no_security",
+    "mcx",
 ]
 
 # Following are the input size.
@@ -181,32 +182,32 @@ parser.add_argument(
     default=False,
 )
 
-#parser.add_argument(
-#    "--l3_size",
-#    type=str,
-#    required=True,
-#    default="1MB",
-#    help="L3 size for MCX",
-#)
-#
-#parser.add_argument(
-#    "--mcx_policy",
-#    type=str,
-#    required=True,
-#    default="never",
-#    choices=[
-#        "insecure",
-#        "never",
-#        "always",
-#        "counter",
-#        "hotspot",
-#        "read-write",
-#        "approx-ancestors",
-#        "approx-ancestors-v2",
-#        "l3-hitrate",
-#    ],
-#    help="MCX policy",
-#)
+parser.add_argument(
+    "--l3_size",
+    type=str,
+    required=True,
+    default="1MB",
+    help="L3 size for MCX",
+)
+
+parser.add_argument(
+    "--mcx_policy",
+    type=str,
+    required=True,
+    default="never",
+    choices=[
+        "insecure",
+        "never",
+        "always",
+        "counter",
+        "hotspot",
+        "read-write",
+        "approx-ancestors",
+        "approx-ancestors-v2",
+        "l3-hitrate",
+    ],
+    help="MCX policy",
+)
 
 args = parser.parse_args()
 
@@ -254,6 +255,19 @@ elif (args.memory == "integrity_tree"):
         bonsai=not args.no_bonsai,
         #l3_cache_size=args.l3_size,
         #protocol=args.mcx_policy,
+    )
+elif (args.memory == "mcx"):
+    memory = MCXSecureMemory(
+        size="16GiB",
+        latency=args.encryption_latency,
+        cache=not args.no_metadata_cache,
+        metadata_cache_size=args.metadata_cache_size,
+        arity=args.arity,
+        cache_mac=args.cache_mac,
+        eager_fetch=args.eager_fetch,
+        bonsai=not args.no_bonsai,
+        l3_cache_size=args.l3_size,
+        protocol=args.mcx_policy,
     )
 else:
     memory = DualChannelDDR3_1600(
