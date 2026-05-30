@@ -287,7 +287,7 @@ class Configurable : public SimObject
     bool eager_fetch;
     
     // configurable notion of when to perform security
-    bool secure;
+    int secure;
 
     // configurable notion of what kind of tree protection is in place
     bool bonsai;

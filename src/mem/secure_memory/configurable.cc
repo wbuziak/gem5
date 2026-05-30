@@ -103,6 +103,15 @@ Configurable::startup()
     integrity_levels.shrink_to_fit(); // C++ data structures... meh :/
 
     secure = 0;
+
+    // hashing
+    secure = secure | 1;
+
+    // encryption
+    // secure = secure | (1 << 1);
+
+    // integrity checking
+    // secure = secure | (1 << 2);
 }
 
 Port&
@@ -332,7 +341,8 @@ Configurable::handleRequest(PacketPtr pkt)
     }
 
     // send counter request to memory
-    if (secure) {
+    // Only when we want to do encryption
+    if (secure & (1 << 1)) {
       counter_pkt->allocate();
       if (use_metadata_cache) {
           metadata_request_port.sendPacket(counter_pkt);
