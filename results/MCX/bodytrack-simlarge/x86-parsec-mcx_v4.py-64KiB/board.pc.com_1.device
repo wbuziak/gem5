@@ -449,3 +449,8 @@ PARSEC Benchmark Suite Version 3.0-beta-20150206
 [HOOKS] PARSEC Hooks Version 1.2
 Threading with Posix Threads
 Number of threads : 4
+Using dataset : sequenceB_4/
+4000 particles with 5 annealing layers
+
+[HOOKS] Entering ROI
+Processing frame 0
