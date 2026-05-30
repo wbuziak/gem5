@@ -360,7 +360,7 @@ simulator = Simulator(
     board=board,
     on_exit_event={
         ExitEvent.WORKBEGIN: handle_workbegin(),
-        ExitEvent.WORKEND: handle_workend(),
+        ExitEvent.MAX_INSTS: handle_workend(),
     },
 )
 
