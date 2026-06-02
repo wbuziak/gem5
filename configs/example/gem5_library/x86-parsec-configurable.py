@@ -380,7 +380,6 @@ simulator = Simulator(
 globalStart = time.time()
 
 print("Running the simulation")
-print("Using KVM cpu")
 
 m5.stats.reset()
 

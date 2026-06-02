@@ -326,8 +326,10 @@ Configurable::handleRequest(PacketPtr pkt)
                }
             }
         } else {
+          if (secure) {
             delete counter_pkt;
             return true;
+          }
         }
     }
 
@@ -942,6 +944,7 @@ Configurable::parallelReadAndWrite(PacketPtr pkt)
                 pkt->makeResponse();
                 found_reads.push_back(pkt);
 
+                printf("parallelReadAndWrite - pkt found in cipher_queue\n");
                 // respond to processor in same clock cycle
                 if (!parallelReadRespondEvent.scheduled()) {
                     schedule(parallelReadRespondEvent, curTick());
@@ -967,6 +970,7 @@ Configurable::parallelReadAndWrite(PacketPtr pkt)
                 pkt->makeResponse();
                 found_reads.push_back(pkt);
 
+                printf("parallelReadAndWrite - pkt found in awaiting_counter queue\n");
                 // respond to processor in same clock cycle
                 if (!parallelReadRespondEvent.scheduled()) {
                     schedule(parallelReadRespondEvent, curTick());
@@ -1017,6 +1021,7 @@ Configurable::respondParallelRead()
 void
 Configurable::respondMetadataCache()
 {
+    assert(secure);
     assert(!metadata_response_queue.empty());
     PacketPtr to_send = metadata_response_queue.front();
     metadata_response_port.sendPacket(to_send);
@@ -1196,6 +1201,7 @@ Configurable::MetadataRequestPort::sendPacket(PacketPtr pkt)
 bool
 Configurable::MetadataResponsePort::recvTimingReq(PacketPtr pkt)
 {
+    assert(secure);
     assert(pkt->isRequest());
 
     if (pkt->isRead() || pkt->isWrite()) {
@@ -1227,6 +1233,7 @@ Configurable::MetadataResponsePort::recvTimingReq(PacketPtr pkt)
 void
 Configurable::MetadataResponsePort::sendPacket(PacketPtr pkt)
 {
+    assert(secure);
     assert(pkt->isResponse());
     if (!sendTimingResp(pkt)) {
         blocked_packets.push_back(pkt);

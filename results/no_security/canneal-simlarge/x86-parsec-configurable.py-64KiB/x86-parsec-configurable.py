@@ -55,7 +55,7 @@ from gem5.coherence_protocol import CoherenceProtocol
 from gem5.components.boards.x86_board import X86Board
 from gem5.components.memory.secure_ddr4 import ConfigurableMemory 
 from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory
-from gem5.components.memory.multi_channel import DualChannelDDR3_1600
+from gem5.components.memory.multi_channel import DualChannelDDR4_2400
 from gem5.components.processors.cpu_types import CPUTypes
 from gem5.components.processors.simple_switchable_processor import (
     SimpleSwitchableProcessor,
@@ -270,7 +270,7 @@ elif (args.memory == "mcx"):
         protocol=args.mcx_policy,
     )
 else:
-    memory = DualChannelDDR3_1600(
+    memory =DualChannelDDR4_2400( 
         size="16GiB",
     )
 
@@ -351,16 +351,27 @@ def handle_workbegin():
 
 
 def handle_workend():
+    print()
+    print("Benchmark finished")
     print("Dump stats at the end of the ROI!")
     m5.stats.dump()
+    print()
     yield True
 
+def handle_max_insts():
+    print()
+    print("Maximum instructions reached")
+    print("Dump stats at the end of the ROI!")
+    m5.stats.dump()
+    print()
+    yield True
 
 simulator = Simulator(
     board=board,
     on_exit_event={
         ExitEvent.WORKBEGIN: handle_workbegin(),
         ExitEvent.WORKEND: handle_workend(),
+        ExitEvent.MAX_INSTS: handle_max_insts(),
     },
 )
 
@@ -379,8 +390,6 @@ simulator.run()
 print("All simulation events were successful.")
 
 # We print the final simulation statistics.
-
-print("Done with the simulation")
 print()
 print("Performance statistics:")
 
