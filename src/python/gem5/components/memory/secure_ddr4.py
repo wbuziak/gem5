@@ -151,29 +151,58 @@ class SecureDDR4(AbstractMemorySystem):
                 self.metadata_cache.mem_side
             )
 
+        # Check that we actually want an L3 cache before building it
         if secure_memory_class == MCX:
+            # Only build if size is not 'none' and greater than 0 bytes
+            if str(l3_size).lower() != "none" and toMemorySize(str(l3_size)) > 0:
 
-            class L3Cache(Cache):
-                def __init__(
-                    self,
-                ):
-                    super().__init__()
-                    self.size = l3_size
-                    self.assoc = 64
-                    self.tag_latency = 32
-                    self.data_latency = 32
-                    self.response_latency = 1
-                    self.mshrs = 50
-                    self.tgts_per_mshr = 16
-                    self.writeback_clean = False
-                    self.clusivity = "mostly_incl"
-                    self.prefetcher = StridePrefetcher()
+                class L3Cache(Cache):
+                    def __init__(
+                        self,
+                    ):
+                        super().__init__()
+                        self.size = l3_size
+                        self.assoc = 64
+                        self.tag_latency = 32
+                        self.data_latency = 32
+                        self.response_latency = 1
+                        self.mshrs = 50
+                        self.tgts_per_mshr = 16
+                        self.writeback_clean = False
+                        self.clusivity = "mostly_incl"
+                        self.prefetcher = StridePrefetcher()
 
-            self.secure_memory.l3 = L3Cache()
-            self.secure_memory.l3_request_port = self.secure_memory.l3.cpu_side
-            self.secure_memory.l3_response_port = (
-                self.secure_memory.l3.mem_side
-            )
+                self.secure_memory.l3 = L3Cache()
+                self.secure_memory.l3_request_port = self.secure_memory.l3.cpu_side
+                self.secure_memory.l3_response_port = (
+                    self.secure_memory.l3.mem_side
+                )
+            else:
+                # SHORT-CIRCUIT: Tie the L3 ports together to bypass
+                self.secure_memory.l3_request_port = self.secure_memory.l3_response_port
+#        if secure_memory_class == MCX:
+#
+#            class L3Cache(Cache):
+#                def __init__(
+#                    self,
+#                ):
+#                    super().__init__()
+#                    self.size = l3_size
+#                    self.assoc = 64
+#                    self.tag_latency = 32
+#                    self.data_latency = 32
+#                    self.response_latency = 1
+#                    self.mshrs = 50
+#                    self.tgts_per_mshr = 16
+#                    self.writeback_clean = False
+#                    self.clusivity = "mostly_incl"
+#                    self.prefetcher = StridePrefetcher()
+#
+#            self.secure_memory.l3 = L3Cache()
+#            self.secure_memory.l3_request_port = self.secure_memory.l3.cpu_side
+#            self.secure_memory.l3_response_port = (
+#                self.secure_memory.l3.mem_side
+#            )
 
         self.to_mem = L2XBar()
         self.secure_memory.mem_side = self.to_mem.cpu_side_ports

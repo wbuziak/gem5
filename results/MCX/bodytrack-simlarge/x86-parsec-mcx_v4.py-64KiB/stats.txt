@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 
 ---------- Begin Simulation Statistics ----------
 simSeconds                                   0.033195                       # Number of seconds simulated (Second)
@@ -8754,3 +8755,5 @@ board.workload.inst.arm                             0                       # nu
 board.workload.inst.quiesce                         0                       # number of quiesce instructions executed (Count)
 
 ---------- End Simulation Statistics   ----------
+=======
+>>>>>>> Stashed changes
