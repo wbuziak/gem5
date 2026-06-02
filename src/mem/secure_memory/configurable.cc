@@ -1158,6 +1158,7 @@ Configurable::MemSidePort::sendPacket(PacketPtr pkt)
 bool
 Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
 {
+    assert(parent->secure);
     if (parent->isMac(pkt->getAddr())) {
         assert(parent->cache_mac);
         if (parent->bonsai) {
@@ -1175,6 +1176,7 @@ Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
 void
 Configurable::MetadataRequestPort::recvReqRetry()
 {
+    assert(parent->secure);
     assert(!blocked_packets.empty());
 
     do {
@@ -1190,6 +1192,7 @@ Configurable::MetadataRequestPort::recvReqRetry()
 void
 Configurable::MetadataRequestPort::sendPacket(PacketPtr pkt)
 {
+    assert(parent->secure);
     assert(pkt->isRequest());
     assert(!parent->isMac(pkt->getAddr()) || parent->cache_mac);
 
@@ -1201,7 +1204,7 @@ Configurable::MetadataRequestPort::sendPacket(PacketPtr pkt)
 bool
 Configurable::MetadataResponsePort::recvTimingReq(PacketPtr pkt)
 {
-    assert(secure);
+    assert(parent->secure);
     assert(pkt->isRequest());
 
     if (pkt->isRead() || pkt->isWrite()) {
@@ -1233,7 +1236,7 @@ Configurable::MetadataResponsePort::recvTimingReq(PacketPtr pkt)
 void
 Configurable::MetadataResponsePort::sendPacket(PacketPtr pkt)
 {
-    assert(secure);
+    assert(parent->secure);
     assert(pkt->isResponse());
     if (!sendTimingResp(pkt)) {
         blocked_packets.push_back(pkt);
