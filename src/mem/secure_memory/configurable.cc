@@ -268,9 +268,12 @@ Configurable::handleRequest(PacketPtr pkt)
     }
 
     // create request for associated metadata
-    Addr counter_addr = calculateCounterAddress(pkt->getAddr());
-    RequestPtr req = std::make_shared<Request>(counter_addr, BLOCK_SIZE, 0, 0);
-    PacketPtr counter_pkt = Packet::createRead(req);
+    PacketPtr counter_pkt = NULL;
+    if (secure) {
+      Addr counter_addr = calculateCounterAddress(pkt->getAddr());
+      RequestPtr req = std::make_shared<Request>(counter_addr, BLOCK_SIZE, 0, 0);
+      PacketPtr counter_pkt = Packet::createRead(req);
+    }
 
     if (pkt->isWrite()) {
         if (secure) {
