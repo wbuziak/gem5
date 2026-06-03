@@ -33,7 +33,7 @@
         "mmap_using_noreserve": false,
         "multi_thread": false,
         "num_work_ids": 16,
-        "readfile": "/home/wbuziak/repos/gem5/results/MCX/x86-parsec-integrity.py/canneal-simlarge/64KiB/readfile_0x7e64b6cb49e94114",
+        "readfile": "/home/wbuziak/repos/gem5/results/MCX/fluidanimate-simlarge/x86-parsec-mcx_v4.py-64KiB/readfile_-0x25825607589015cf",
         "redirect_paths": [],
         "shadow_rom_ranges": [],
         "shared_backstore": "",
