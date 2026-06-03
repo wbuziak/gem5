@@ -298,16 +298,27 @@ def handle_workbegin():
 
 
 def handle_workend():
+    print()
+    print("Benchmark finished")
     print("Dump stats at the end of the ROI!")
     m5.stats.dump()
+    print()
     yield True
 
+def handle_max_insts():
+    print()
+    print("Maximum instructions reached")
+    print("Dump stats at the end of the ROI!")
+    m5.stats.dump()
+    print()
+    yield True
 
 simulator = Simulator(
     board=board,
     on_exit_event={
         ExitEvent.WORKBEGIN: handle_workbegin(),
-        ExitEvent.MAX_INSTS: handle_workend(),
+        ExitEvent.WORKEND: handle_workend(),
+        ExitEvent.MAX_INSTS: handle_max_insts(),
     },
 )
 
