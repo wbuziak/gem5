@@ -53,7 +53,7 @@ from m5.objects import Root
 
 from gem5.coherence_protocol import CoherenceProtocol
 from gem5.components.boards.x86_board import X86Board
-from gem5.components.memory.secure_ddr4 import ConfigurableMemory 
+from gem5.components.memory.secure_ddr4 import MCXSecureMemory
 from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory
 from gem5.components.memory.multi_channel import DualChannelDDR4_2400
 from gem5.components.processors.cpu_types import CPUTypes
