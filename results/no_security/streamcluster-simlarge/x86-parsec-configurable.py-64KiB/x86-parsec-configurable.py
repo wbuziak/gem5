@@ -380,7 +380,6 @@ simulator = Simulator(
 globalStart = time.time()
 
 print("Running the simulation")
-print("Using KVM cpu")
 
 m5.stats.reset()
 
@@ -392,12 +391,8 @@ print("All simulation events were successful.")
 # We print the final simulation statistics.
 print()
 print("Performance statistics:")
-
-print("Simulated time in ROI: " + (str(simulator.get_roi_ticks()[0])))
-print(
-    "Ran a total of", simulator.get_current_tick() / 1e12, "simulated seconds"
-)
-print(
-    "Total wallclock time: %.2fs, %.2f min"
-    % (time.time() - globalStart, (time.time() - globalStart) / 60)
-)
+roi_ticks = simulator.get_roi_ticks()
+if roi_ticks:
+    print("Simulated time in ROI: " + str(roi_ticks[0]))
+else:
+    print("Simulated time in ROI: N/A (Simulation exited before ROI completed)")
