@@ -55,7 +55,7 @@ from gem5.coherence_protocol import CoherenceProtocol
 from gem5.components.boards.x86_board import X86Board
 from gem5.components.memory.secure_ddr4 import ConfigurableMemory 
 from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory
-from gem5.components.memory.multi_channel import DualChannelDDR3_1600
+from gem5.components.memory.multi_channel import DualChannelDDR4_2400
 from gem5.components.processors.cpu_types import CPUTypes
 from gem5.components.processors.simple_switchable_processor import (
     SimpleSwitchableProcessor,
@@ -270,7 +270,7 @@ elif (args.memory == "mcx"):
         protocol=args.mcx_policy,
     )
 else:
-    memory = DualChannelDDR3_1600(
+    memory =DualChannelDDR4_2400( 
         size="16GiB",
     )
 
@@ -380,7 +380,6 @@ simulator = Simulator(
 globalStart = time.time()
 
 print("Running the simulation")
-print("Using KVM cpu")
 
 m5.stats.reset()
 
@@ -390,16 +389,10 @@ simulator.run()
 print("All simulation events were successful.")
 
 # We print the final simulation statistics.
-
-print("Done with the simulation")
 print()
 print("Performance statistics:")
-
-print("Simulated time in ROI: " + (str(simulator.get_roi_ticks()[0])))
-print(
-    "Ran a total of", simulator.get_current_tick() / 1e12, "simulated seconds"
-)
-print(
-    "Total wallclock time: %.2fs, %.2f min"
-    % (time.time() - globalStart, (time.time() - globalStart) / 60)
-)
+roi_ticks = simulator.get_roi_ticks()
+if roi_ticks:
+    print("Simulated time in ROI: " + str(roi_ticks[0]))
+else:
+    print("Simulated time in ROI: N/A (Simulation exited before ROI completed)")
