@@ -53,7 +53,7 @@ from m5.objects import Root
 
 from gem5.coherence_protocol import CoherenceProtocol
 from gem5.components.boards.x86_board import X86Board
-from gem5.components.memory.secure_ddr4 import MCXSecureMemory
+from gem5.components.memory.secure_ddr4 import ConfigurableMemory 
 from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory
 from gem5.components.memory.multi_channel import DualChannelDDR4_2400
 from gem5.components.processors.cpu_types import CPUTypes
@@ -84,6 +84,7 @@ benchmark_choices = [
     "swaptions",
     "vips",
     "x264",
+    "microbenchmark",
 ]
 
 # Memory module choices
@@ -313,13 +314,24 @@ board = X86Board(
 # properly.
 
 
-command = (
-    f"cd /home/gem5/parsec-benchmark;"
-    + "source env.sh;"
-    + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size}         -n 4;"
-    + "sleep 5;"
-    + "m5 exit;"
-)
+# micro-benchmark command
+if (args.benchmark == "microbenchmark"):
+    command = (
+        f"cd;"
+        f"cd repos/microbenchmark;"
+        f"./bin/micro 500000000 536870900;" # 500 million accesses on approximately 2GB  
+        f"sleep 5;"
+        f"m5 exit;"
+    )
+else:
+# parsec command
+    command = (
+        f"cd /home/gem5/parsec-benchmark;"
+        + "source env.sh;"
+        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size}         -n 4;"
+        + "sleep 5;"
+        + "m5 exit;"
+    )
 
 board.set_kernel_disk_workload(
     # The x86 linux kernel will be automatically downloaded to the
@@ -391,12 +403,8 @@ print("All simulation events were successful.")
 # We print the final simulation statistics.
 print()
 print("Performance statistics:")
-
-print("Simulated time in ROI: " + (str(simulator.get_roi_ticks()[0])))
-print(
-    "Ran a total of", simulator.get_current_tick() / 1e12, "simulated seconds"
-)
-print(
-    "Total wallclock time: %.2fs, %.2f min"
-    % (time.time() - globalStart, (time.time() - globalStart) / 60)
-)
+roi_ticks = simulator.get_roi_ticks()
+if roi_ticks:
+    print("Simulated time in ROI: " + str(roi_ticks[0]))
+else:
+    print("Simulated time in ROI: N/A (Simulation exited before ROI completed)")
