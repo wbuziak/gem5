@@ -282,7 +282,9 @@ Configurable::handleRequest(PacketPtr pkt)
     PacketPtr counter_pkt = Packet::createRead(req);
 
     if (pkt->isWrite()) {
-        if (secure) {
+        printf("handleRequest - write\n");
+        if (secure & (1 << 1)) {
+          // check this
           // need to fetch encryption counter prior to encryption
           awaiting_counter.emplace(pkt);
         } else {
@@ -291,6 +293,7 @@ Configurable::handleRequest(PacketPtr pkt)
         }
     } else {
         assert(pkt->isRead());
+        printf("handleRequest - read\n");
 
         if (!parallelReadAndWrite(pkt)) {
             // if the encryption counter comes back first, tell it who we are
@@ -307,8 +310,8 @@ Configurable::handleRequest(PacketPtr pkt)
             mem_port.sendPacket(pkt);
 
             // request the mac as well
-
-            if (secure) {
+            // Only if hashing flag is set
+            if (secure & 1) {
               Addr mac_addr = calculateMacAddress(pkt->getAddr());
               RequestPtr req = std::make_shared<Request>(
                   mac_addr, BLOCK_SIZE, 0, 0
@@ -319,8 +322,10 @@ Configurable::handleRequest(PacketPtr pkt)
               mac_pkt->allocate();
 
               if (use_metadata_cache && cache_mac) {
+                  printf("handleRequest - sending mac to metadata cache\n");
                   metadata_request_port.sendPacket(mac_pkt);
               } else {
+                  printf("handleRequest - sending mac to mem\n");
                   mem_port.sendPacket(mac_pkt);
 
                   if (!bonsai) {
@@ -650,7 +655,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 bool
 Configurable::handleMacResponse(PacketPtr pkt)
 {
-    assert(secure);
+    assert(secure & 1);
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -691,7 +696,7 @@ Configurable::handleMacResponse(PacketPtr pkt)
 bool
 Configurable::initiateCipher(PacketPtr pkt)
 {
-    assert(secure);
+    assert(secure & (1 << 1));
     // need to decrypt the data prior to sending to processor
     if (cipher_queue.size() == max_cipher_size) {
         return false;
@@ -736,7 +741,7 @@ Configurable::initiateCipher(PacketPtr pkt)
 bool
 Configurable::initiateMac(PacketPtr pkt)
 {
-    assert(secure);
+    assert(secure & 1);
     // need to decrypt the data prior to sending to processor
     if (hashing_queue.size() == max_mac_size) {
         return false;
@@ -889,6 +894,7 @@ Configurable::cipherEngine()
 void
 Configurable::macEngine()
 {
+    assert(secure & 1);
     assert(!hashing_queue.empty());
 
     PacketPtr pkt = hashing_queue.front().first;
@@ -1096,20 +1102,28 @@ bool
 Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
 {
     //assert(getAddrRanges().size() == 1);
+    printf("memSidePort - recvTimingResp\n");
 
     if (pkt->getAddr() >= getAddrRanges().front().end()) {
         bool is_metadata = parent->isMetadata(pkt->getAddr());
         bool is_mac = parent->isMac(pkt->getAddr());
 
         if (parent->secure) {
+          // integrity checking or encryption
           if (is_metadata && !is_mac) {
               // this is a tree node
               assert(!is_mac);
               if (parent->use_metadata_cache) {
                   parent->metadata_response_port.sendPacket(pkt);
-              } else if (parent->bonsai) {
+              } else if (parent->bonsai && parent->secure & (1 << 2)) {
+                  // Only call this if secure flag is set
+                  // to do integrity checking
+                  assert(parent->secure & (1 << 2));
                   assert(parent->handleTreeResponse(pkt));
               } else {
+                  // this should only be called if we are 
+                  // doing encryption
+                  assert(parent->secure & (1 << 1));
                   assert(parent->processCounterResponse(pkt));
               }
           } else {
@@ -1117,7 +1131,9 @@ Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
               assert(is_mac);
               if (parent->cache_mac) {
                   parent->metadata_response_port.sendPacket(pkt);
-              } else if (!parent->bonsai) {
+              } else if (!parent->bonsai && parent->secure & (1 << 2)) {
+                  // We only want to handle tree responses when
+                  // doing integrity checking
                   assert(parent->handleTreeResponse(pkt));
               } else {
                   assert(parent->bonsai);
@@ -1165,14 +1181,21 @@ Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
 {
     if (parent->isMac(pkt->getAddr())) {
         assert(parent->cache_mac);
-        if (parent->bonsai) {
+        if (parent->bonsai && parent->secure & 1) {
+            // hashing
             return parent->handleMacResponse(pkt);
         } else {
+            // bonsai
+            assert(parent->secure & (1 << 2));
             return parent->handleTreeResponse(pkt);
         }
-    } else if (parent->isCounter(pkt->getAddr())) {
+    } else if (parent->isCounter(pkt->getAddr()) && parent->secure & (1 << 1)) {
+        // not a mac, we want to do encryption
         return parent->processCounterResponse(pkt);
     } else {
+        // not a mac, not a counter, no encryption
+        // we want to do integrity checking
+        assert(parent->secure & (1 << 2));
         return parent->handleTreeResponse(pkt);
     }
 }
