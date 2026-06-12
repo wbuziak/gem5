@@ -407,55 +407,59 @@ Configurable::handleResponse(PacketPtr pkt)
     assert(pkt->isResponse());
 
     if (pkt->isRead() && !parallelReadAndWrite(pkt)) {
-      if (secure) {
-        // check if the counter has returned
-        auto ctr_found = counter_fetched.find(pkt->getAddr());
-        if (ctr_found != counter_fetched.end()) {
-            // we are all set to start the decryption procedure
-            if (!initiateCipher(pkt)) {
-                return false;
-            } else {
-                assert(awaiting_counter.find(pkt) == awaiting_counter.end());
-            }
+        
+        // 1. Wait for Counters ONLY if encryption is enabled
+        if (secure & (1 << 1)) {
+            auto ctr_found = counter_fetched.find(pkt->getAddr());
+            if (ctr_found != counter_fetched.end()) {
+                // we are all set to start the decryption procedure
+                if (!initiateCipher(pkt)) {
+                    return false;
+                } else {
+                    assert(awaiting_counter.find(pkt) == awaiting_counter.end());
+                }
 
-            // cipher has happened, we don't need to track
-            ctr_found->second--;
-            if (ctr_found->second == 0) {
-                counter_fetched.erase(pkt->getAddr());
+                // cipher has happened, we don't need to track
+                ctr_found->second--;
+                if (ctr_found->second == 0) {
+                    counter_fetched.erase(pkt->getAddr());
+                }
+            } else {
+                // the counter hasn't returned from memory yet...
+                bool success;
+                std::tie(std::ignore, success) = awaiting_counter.emplace(pkt);
+                assert(success);
             }
-        } else {
-            // the counter hasn't returned from memory yet...
-            // when the counter returns, tell it to initiate the cipher
-            bool success;
-            std::tie(std::ignore, success) = awaiting_counter.emplace(pkt);
-            assert(success);
         }
 
-        auto mac_found = mac_fetched.find(pkt->getAddr());
-        if (mac_found != mac_fetched.end()) {
-            // we are all set to start the authentication procedure
-            if (!initiateMac(pkt)) {
-                return false;
-            } else {
-                assert(awaiting_mac.find(pkt) == awaiting_mac.end());
-            }
+        // 2. Wait for MACs ONLY if hashing is enabled
+        if (secure & 1) {
+            auto mac_found = mac_fetched.find(pkt->getAddr());
+            if (mac_found != mac_fetched.end()) {
+                // we are all set to start the authentication procedure
+                if (!initiateMac(pkt)) {
+                    return false;
+                } else {
+                    assert(awaiting_mac.find(pkt) == awaiting_mac.end());
+                }
 
-            // mac has happended, we don't need to track
-            mac_found->second--;
-            if (mac_found->second == 0) {
-                mac_fetched.erase(pkt->getAddr());
+                // mac has happened, we don't need to track
+                mac_found->second--;
+                if (mac_found->second == 0) {
+                    mac_fetched.erase(pkt->getAddr());
+                }
+            } else {
+                // the mac hasn't returned from memory yet...
+                bool success;
+                std::tie(std::ignore, success) = awaiting_mac.emplace(pkt);
+                assert(success);
             }
-        } else {
-            // the mac hasn't returned from memory yet...
-            // when the mac returns, tell it to initiate the authentication
-            bool success;
-            std::tie(std::ignore, success) = awaiting_mac.emplace(pkt);
-            assert(success);
         }
-      } else {
-            // No security - just send packets to processor
+        
+        // 3. If NO security is enabled, send straight to CPU
+        if (secure == 0) {
             cpu_port.sendPacket(pkt);
-      }
+        }
 
         assert(pending_reads.find(pkt->getAddr()) != pending_reads.end());
         pending_reads[pkt->getAddr()]--;
@@ -463,6 +467,7 @@ Configurable::handleResponse(PacketPtr pkt)
         if (pending_reads[pkt->getAddr()] == 0) {
             pending_reads.erase(pkt->getAddr());
         }
+        
     } else if (pkt->isRead()) {
         // cleanup handled by parallelReadAndWrite... do nothing!
     } else {
