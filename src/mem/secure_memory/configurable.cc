@@ -284,11 +284,13 @@ Configurable::handleRequest(PacketPtr pkt)
     if (pkt->isWrite()) {
         printf("handleRequest - write\n");
         if (secure & (1 << 1)) {
-          // check this
-          // need to fetch encryption counter prior to encryption
+          // Encryption is enabled, fetch counter
           awaiting_counter.emplace(pkt);
+        } else if (secure & 1) {
+          // Hashing is enabled, but encryption is not. Route to MAC queue.
+          initiateMac(pkt);
         } else {
-          // Simply forward the write to memory
+          // No security. Forward straight to memory.
           mem_port.sendPacket(pkt);
         }
     } else {
@@ -850,31 +852,39 @@ Configurable::cipherEngine()
         } else {
             handleCounterResponse(pkt);
         }
-    } else {
-         // try to process data
-        auto mac_it = std::find(hashed_packets.begin(),
-                                hashed_packets.end(), pkt);
-        if (mac_it != hashed_packets.end()) {
-            // the data has already been ciphered
+   } else {
+        // Are we ALSO doing hashing? If so, we must rendezvous.
+        if (secure & 1) {
+            auto mac_it = std::find(hashed_packets.begin(),
+                                    hashed_packets.end(), pkt);
+            if (mac_it != hashed_packets.end()) {
+                // Both cipher and MAC are done
+                if (pkt->isWrite()) {
+                    assert(pkt->isRequest());
+                    updateTree(pkt);
+                } else {
+                    assert(pkt->isRead() && pkt->isResponse());
+                    assert(awaiting_counter.find(pkt) == awaiting_counter.end());
+                    cpu_port.sendPacket(pkt);
+                }
+                hashed_packets.erase(mac_it);
+            } else {
+                // Cipher is done, but MAC is not. Wait for MAC.
+                assert(awaiting_counter.find(pkt) == awaiting_counter.end());
+                ciphered_packets.push_back(pkt);
+            }
+        } else {
+            // Hashing is disabled. Cipher is the only security step.
             if (pkt->isWrite()) {
                 assert(pkt->isRequest());
                 updateTree(pkt);
             } else {
                 assert(pkt->isRead() && pkt->isResponse());
-
-                // respond to the processor
                 assert(awaiting_counter.find(pkt) == awaiting_counter.end());
                 cpu_port.sendPacket(pkt);
             }
-
-            // make sure that the ciphered packet is removed
-            hashed_packets.erase(mac_it);
-        } else {
-            // not done with cipher
-            assert(awaiting_counter.find(pkt) == awaiting_counter.end());
-            ciphered_packets.push_back(pkt);
         }
-    }
+    } 
 
     // schedule the next encryption/decryption when it is read to be executed
     if (!(cipher_queue.empty() && xor_queue.empty()) &&
@@ -908,30 +918,38 @@ Configurable::macEngine()
     if (isMetadata(pkt->getAddr())) {
         handleTreeResponse(pkt);
     } else {
-        // try to process data
-        auto cipher_it = std::find(ciphered_packets.begin(),
-                                   ciphered_packets.end(), pkt);
-        if (cipher_it != ciphered_packets.end()) {
-            // the data has already been ciphered
+        // Are we ALSO doing encryption? If so, we must rendezvous.
+        if (secure & (1 << 1)) {
+            auto cipher_it = std::find(ciphered_packets.begin(),
+                                       ciphered_packets.end(), pkt);
+            if (cipher_it != ciphered_packets.end()) {
+                // Both cipher and MAC are done
+                if (pkt->isWrite()) {
+                    assert(pkt->isRequest());
+                    updateTree(pkt);
+                } else {
+                    assert(pkt->isRead() && pkt->isResponse());
+                    assert(awaiting_counter.find(pkt) == awaiting_counter.end());
+                    cpu_port.sendPacket(pkt);
+                }
+                ciphered_packets.erase(cipher_it);
+            } else {
+                // MAC is done, but cipher is not. Wait for cipher.
+                hashed_packets.push_back(pkt);
+            }
+        } else {
+            // Encryption is disabled. MAC is the only security step.
             if (pkt->isWrite()) {
                 assert(pkt->isRequest());
                 updateTree(pkt);
             } else {
                 assert(pkt->isRead() && pkt->isResponse());
-
-                // respond to the processor
-                assert(awaiting_counter.find(pkt) == awaiting_counter.end());
                 cpu_port.sendPacket(pkt);
             }
-
-            ciphered_packets.erase(cipher_it);
-        } else {
-            // not done with cipher
-            hashed_packets.push_back(pkt);
         }
     }
 
-    // schedule the next encryption/decryption when it is read to be executed
+    // schedule the next encryption/decryption when it is ready to be executed
     if (!hashing_queue.empty() && !macEvent.scheduled()) {
         schedule(macEvent, hashing_queue.front().second);
     }
