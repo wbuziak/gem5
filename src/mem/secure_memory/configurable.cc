@@ -780,51 +780,55 @@ Configurable::initiateMac(PacketPtr pkt)
 void
 Configurable::updateTree(PacketPtr pkt)
 {
-    // data is encrypted and MAC is computed
-    // send all three to memory
-    // addrs
-    Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
-    Addr mac_addr = calculateMacAddress(pkt->getAddr());
+    // 1. Data is always sent to memory
+    mem_port.sendPacket(pkt);
 
-    mem_port.sendPacket(pkt); // send data to memory
-
-    RequestPtr ctr_req = std::make_shared<Request>(ctr_addr, BLOCK_SIZE, 0, 0);
-    PacketPtr counter_pkt = Packet::createWrite(ctr_req);
-    counter_pkt->allocate();
-
-    if (use_metadata_cache) {
-        // send counter to the cache
-        metadata_request_port.sendPacket(counter_pkt);
-    } else {
-        mem_port.sendPacket(counter_pkt); // send counter to memory
-    }
-
-    // make parent packets
-    Addr addr = bonsai ? ctr_addr : mac_addr;
-    do {
-        addr = calculateParentAddress(addr);
-
-        RequestPtr req = std::make_shared<Request>(addr, BLOCK_SIZE, 0, 0);
-        PacketPtr pkt = Packet::createWrite(req);
-        pkt->allocate();
+    // 2. Update Counter (Only if Encryption is enabled: bit 1)
+    if (secure & (1 << 1)) {
+        Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
+        RequestPtr ctr_req = std::make_shared<Request>(ctr_addr, BLOCK_SIZE, 0, 0);
+        PacketPtr counter_pkt = Packet::createWrite(ctr_req);
+        counter_pkt->allocate();
 
         if (use_metadata_cache) {
-            // send tree node to the cache
-            metadata_request_port.sendPacket(pkt);
+            metadata_request_port.sendPacket(counter_pkt);
         } else {
-            mem_port.sendPacket(pkt); // send tree node to memory
+            mem_port.sendPacket(counter_pkt);
         }
-    } while (addr != integrity_levels[1]);
+    }
 
-    // make mac packet
-    RequestPtr mac_req = std::make_shared<Request>(mac_addr, BLOCK_SIZE, 0, 0);
-    PacketPtr mac_pkt = Packet::createWrite(mac_req);
-    mac_pkt->allocate();
+    // 3. Update Tree (Only if Integrity Checking is enabled: bit 2)
+    if (secure & (1 << 2)) {
+        Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
+        Addr mac_addr = calculateMacAddress(pkt->getAddr());
+        Addr addr = bonsai ? ctr_addr : mac_addr;
+        
+        do {
+            addr = calculateParentAddress(addr);
+            RequestPtr req = std::make_shared<Request>(addr, BLOCK_SIZE, 0, 0);
+            PacketPtr tree_pkt = Packet::createWrite(req);
+            tree_pkt->allocate();
 
-    if (use_metadata_cache && cache_mac) {
-        metadata_request_port.sendPacket(mac_pkt); // send counter to the cache
-    } else {
-        mem_port.sendPacket(mac_pkt); // send counter to memory
+            if (use_metadata_cache) {
+                metadata_request_port.sendPacket(tree_pkt);
+            } else {
+                mem_port.sendPacket(tree_pkt);
+            }
+        } while (addr != integrity_levels[1]);
+    }
+
+    // 4. Update MAC (Only if Hashing is enabled: bit 0)
+    if (secure & 1) {
+        Addr mac_addr = calculateMacAddress(pkt->getAddr());
+        RequestPtr mac_req = std::make_shared<Request>(mac_addr, BLOCK_SIZE, 0, 0);
+        PacketPtr mac_pkt = Packet::createWrite(mac_req);
+        mac_pkt->allocate();
+
+        if (use_metadata_cache && cache_mac) {
+            metadata_request_port.sendPacket(mac_pkt);
+        } else {
+            mem_port.sendPacket(mac_pkt);
+        }
     }
 }
 
@@ -1202,22 +1206,24 @@ Configurable::MemSidePort::sendPacket(PacketPtr pkt)
 bool
 Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
 {
+    // If it's a write response (ACK), just delete it and return.
+    // Metadata writes do not require further processing.
+    if (pkt->isWrite()) {
+        delete pkt;
+        return true;
+    }
+
+    // Otherwise, route read responses based on address and enabled features
     if (parent->isMac(pkt->getAddr())) {
-        assert(parent->cache_mac);
         if (parent->bonsai && parent->secure & 1) {
-            // hashing
             return parent->handleMacResponse(pkt);
         } else {
-            // bonsai
             assert(parent->secure & (1 << 2));
             return parent->handleTreeResponse(pkt);
         }
-    } else if (parent->isCounter(pkt->getAddr()) && parent->secure & (1 << 1)) {
-        // not a mac, we want to do encryption
+    } else if (parent->isCounter(pkt->getAddr()) && (parent->secure & (1 << 1))) {
         return parent->processCounterResponse(pkt);
     } else {
-        // not a mac, not a counter, no encryption
-        // we want to do integrity checking
         assert(parent->secure & (1 << 2));
         return parent->handleTreeResponse(pkt);
     }
