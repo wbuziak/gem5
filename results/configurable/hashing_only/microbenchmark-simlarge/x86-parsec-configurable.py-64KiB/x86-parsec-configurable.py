@@ -319,7 +319,7 @@ if (args.benchmark == "microbenchmark"):
     command = (
         f"cd;"
         f"cd repos/microbenchmark;"
-        f"./bin/micro 5000 536870900;" # 500 million accesses on approximately 8GB  
+        f"./bin/micro 500000000 536870900;" # 500 million accesses on approximately 8GB  
         f"sleep 5;"
         f"m5 exit;"
     )
