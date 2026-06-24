@@ -90,7 +90,10 @@ benchmark_choices = [
 # Memory module choices
 
 memory_choices = [
-    "configurable",
+    "configurable", 
+    "hashing_only",
+    "encryption_only",
+    "full_security",
     "integrity_tree",
     "no_security",
     "mcx",
