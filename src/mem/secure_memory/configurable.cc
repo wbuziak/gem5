@@ -105,13 +105,13 @@ Configurable::startup()
     secure = 0;
 
     // hashing
-    secure = secure | 1;
+    //secure = secure | 1;
 
     // encryption
-    // secure = secure | (1 << 1);
+    secure = secure | (1 << 1);
 
     // integrity checking
-    // secure = secure | (1 << 2);
+    //secure = secure | (1 << 2);
 }
 
 Port&
@@ -282,20 +282,20 @@ Configurable::handleRequest(PacketPtr pkt)
     PacketPtr counter_pkt = Packet::createRead(req);
 
     if (pkt->isWrite()) {
-        printf("handleRequest - write\n");
         if (secure & (1 << 1)) {
           // Encryption is enabled, fetch counter
           awaiting_counter.emplace(pkt);
         } else if (secure & 1) {
           // Hashing is enabled, but encryption is not. Route to MAC queue.
+          // We don't want to wait on the counter
           initiateMac(pkt);
         } else {
           // No security. Forward straight to memory.
+          // Integrity checks only are also just forwarded to memory
           mem_port.sendPacket(pkt);
         }
     } else {
         assert(pkt->isRead());
-        printf("handleRequest - read\n");
 
         if (!parallelReadAndWrite(pkt)) {
             // if the encryption counter comes back first, tell it who we are
@@ -324,10 +324,8 @@ Configurable::handleRequest(PacketPtr pkt)
               mac_pkt->allocate();
 
               if (use_metadata_cache && cache_mac) {
-                  printf("handleRequest - sending mac to metadata cache\n");
                   metadata_request_port.sendPacket(mac_pkt);
               } else {
-                  printf("handleRequest - sending mac to mem\n");
                   mem_port.sendPacket(mac_pkt);
 
                   if (!bonsai) {
@@ -495,7 +493,7 @@ Configurable::processCounterResponse(PacketPtr pkt)
 bool
 Configurable::handleCounterResponse(PacketPtr pkt)
 {
-    assert(secure);
+    assert(secure & (1 << 1));
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -523,7 +521,12 @@ Configurable::handleCounterResponse(PacketPtr pkt)
             if ((*it)->isWrite()) {
                 // not sure who will trigger retry event if this fails
                 assert((*it)->isRequest());
-                assert(initiateMac(*it));
+                // Only call initiateMac if doing hashing
+                if (secure & 1) {
+                    if (!initiateMac(*it)) {
+                        pending_mac.push_back(*it);
+                    }
+                }
             }
 
             // only if read and counter not fetched first
@@ -543,7 +546,7 @@ Configurable::handleCounterResponse(PacketPtr pkt)
 bool
 Configurable::handleTreeResponse(PacketPtr pkt)
 {
-    assert(secure);
+    assert(secure & (1 << 2));
     if (needs_authentication.find(pkt->getAddr()) !=
         needs_authentication.end())
     {
@@ -780,10 +783,10 @@ Configurable::initiateMac(PacketPtr pkt)
 void
 Configurable::updateTree(PacketPtr pkt)
 {
-    // 1. Data is always sent to memory
+    // Data is always sent to memory
     mem_port.sendPacket(pkt);
 
-    // 2. Update Counter (Only if Encryption is enabled: bit 1)
+    // Update Counter (Only if doing Encryption)
     if (secure & (1 << 1)) {
         Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
         RequestPtr ctr_req = std::make_shared<Request>(ctr_addr, BLOCK_SIZE, 0, 0);
@@ -797,7 +800,7 @@ Configurable::updateTree(PacketPtr pkt)
         }
     }
 
-    // 3. Update Tree (Only if Integrity Checking is enabled: bit 2)
+    // Update Tree (Only if doing integrity checks)
     if (secure & (1 << 2)) {
         Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
         Addr mac_addr = calculateMacAddress(pkt->getAddr());
@@ -817,7 +820,7 @@ Configurable::updateTree(PacketPtr pkt)
         } while (addr != integrity_levels[1]);
     }
 
-    // 4. Update MAC (Only if Hashing is enabled: bit 0)
+    // Update MAC (Only if Hashing is enabled)
     if (secure & 1) {
         Addr mac_addr = calculateMacAddress(pkt->getAddr());
         RequestPtr mac_req = std::make_shared<Request>(mac_addr, BLOCK_SIZE, 0, 0);
@@ -835,6 +838,7 @@ Configurable::updateTree(PacketPtr pkt)
 void
 Configurable::cipherEngine()
 {
+    assert(secure & (1 << 1));
     assert(!(cipher_queue.empty() && xor_queue.empty()));
 
     PacketPtr pkt;
@@ -851,9 +855,11 @@ Configurable::cipherEngine()
     }
 
     if (isCounter(pkt->getAddr())) {
-        if (bonsai) {
+        if (bonsai && secure & (1 << 2)) {
+            // Only when integrity checking
             handleTreeResponse(pkt); // checks if data is trusted first
         } else {
+            // Otherwise, just handle the counter
             handleCounterResponse(pkt);
         }
    } else {
@@ -932,6 +938,7 @@ Configurable::macEngine()
                     assert(pkt->isRequest());
                     updateTree(pkt);
                 } else {
+                    // No integrity checking, just forward to cpu 
                     assert(pkt->isRead() && pkt->isResponse());
                     assert(awaiting_counter.find(pkt) == awaiting_counter.end());
                     cpu_port.sendPacket(pkt);
@@ -1129,7 +1136,6 @@ bool
 Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
 {
     //assert(getAddrRanges().size() == 1);
-    printf("memSidePort - recvTimingResp\n");
 
     if (pkt->getAddr() >= getAddrRanges().front().end()) {
         bool is_metadata = parent->isMetadata(pkt->getAddr());
