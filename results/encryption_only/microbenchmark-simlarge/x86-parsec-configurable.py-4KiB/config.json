@@ -33,7 +33,7 @@
         "mmap_using_noreserve": false,
         "multi_thread": false,
         "num_work_ids": 16,
-        "readfile": "/home/wbuziak/repos/gem5/results/configurable/microbenchmark-simlarge/x86-parsec-configurable.py-64KiB/readfile_0x54c14745298152d8",
+        "readfile": "/home/wbuziak/repos/gem5/results/configurable/microbenchmark-simlarge/x86-parsec-configurable.py-4KiB/readfile_-0x6069b5b51b742418",
         "redirect_paths": [],
         "shadow_rom_ranges": [],
         "shared_backstore": "",
@@ -4278,7 +4278,7 @@
                 },
                 "response_latency": 1,
                 "sequential_access": false,
-                "size": 65536,
+                "size": 4096,
                 "system": "board",
                 "tag_latency": 1,
                 "tags": {
@@ -4299,7 +4299,7 @@
                         "assoc": 8,
                         "entry_size": 64,
                         "eventq_index": 0,
-                        "size": 65536
+                        "size": 4096
                     },
                     "partitioning_manager": null,
                     "power_model": [],
@@ -4318,7 +4318,7 @@
                     },
                     "replacement_policy": "board.memory.metadata_cache.replacement_policy",
                     "sequential_access": false,
-                    "size": 65536,
+                    "size": 4096,
                     "system": "board",
                     "tag_latency": 1,
                     "warmup_percentage": 0
@@ -4346,7 +4346,7 @@
                 "path": "board.memory.secure_memory",
                 "bonsai": true,
                 "cache": true,
-                "cache_mac": true,
+                "cache_mac": false,
                 "counter_arity": 64,
                 "eager_fetch": false,
                 "eventq_index": 0,
