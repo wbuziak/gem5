@@ -244,6 +244,7 @@ if (args.memory == "configurable"):
         cache_mac=args.cache_mac,
         eager_fetch=args.eager_fetch,
         bonsai=not args.no_bonsai,
+        secure=args.memory,
         #l3_cache_size=args.l3_size,
         #protocol=args.mcx_policy,
     )

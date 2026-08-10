@@ -102,13 +102,11 @@ Configurable::startup()
 
     integrity_levels.shrink_to_fit(); // C++ data structures... meh :/
 
-    secure = 0;
-
     // hashing
     //secure = secure | 1;
 
     // encryption
-    secure = secure | (1 << 1);
+    //secure = secure | (1 << 1);
 
     // integrity checking
     //secure = secure | (1 << 2);

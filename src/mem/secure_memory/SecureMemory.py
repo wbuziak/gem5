@@ -139,7 +139,7 @@ class Configurable(SimObject):
     mac_arity = Param.UInt64(8, "MAC arity")
 
     # security?
-    secure = Param.Bool(True, "Perform security?")
+    secure = Param.UInt64(7, "Perform security?")
 
     # use cache?
     cache = Param.Bool(True, "Use the metadata cache?")
