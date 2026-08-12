@@ -3,7 +3,6 @@
 export BENCHMARK=$1
 
 configs="
-  configurable
   hashing_only
   encryption_only
   integrity_tree
