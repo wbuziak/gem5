@@ -14,7 +14,11 @@ configs="
   "
 
 for curr in $configs; do
-  echo "Running $BENCHMARK on $curr"
+  echo ""
+  echo "Running $BENCHMARK:"
+  echo "  SECURITY CONFIGURATION: $curr"
+  echo "  METADATA CACHE SIZE:    4 KiB"
+  echo "  CONFIG FILE:            x86-parsec-configurable.py"
   sh run.sh $BENCHMARK simlarge 4KiB $curr x86-parsec-configurable.py
 done
 
