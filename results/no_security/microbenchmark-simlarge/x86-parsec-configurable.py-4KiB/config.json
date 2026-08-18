@@ -33,7 +33,7 @@
         "mmap_using_noreserve": false,
         "multi_thread": false,
         "num_work_ids": 16,
-        "readfile": "/home/wbuziak/repos/gem5/results/encryption_only/microbenchmark-simlarge/x86-parsec-configurable.py-4KiB/readfile_-0x6069b5b51b742418",
+        "readfile": "/home/wbuziak/repos/gem5/results/no_security/microbenchmark-simlarge/x86-parsec-configurable.py-4KiB/readfile_-0x6069b5b51b742418",
         "redirect_paths": [],
         "shadow_rom_ranges": [],
         "shared_backstore": "",

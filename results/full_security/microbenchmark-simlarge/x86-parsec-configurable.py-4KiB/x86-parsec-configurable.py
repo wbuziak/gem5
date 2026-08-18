@@ -93,6 +93,9 @@ memory_choices = [
     "configurable", 
     "hashing_only",
     "encryption_only",
+    "hashing+encryption",
+    "hashing+integrity",
+    "encryption+integrity",
     "full_security", # should be identical to integrity_tree
     "integrity_tree", # sam's implementation
     "no_security",
@@ -244,6 +247,7 @@ if (args.memory == "configurable"):
         cache_mac=args.cache_mac,
         eager_fetch=args.eager_fetch,
         bonsai=not args.no_bonsai,
+        secure=args.memory,
         #l3_cache_size=args.l3_size,
         #protocol=args.mcx_policy,
     )
