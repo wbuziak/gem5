@@ -60,6 +60,7 @@ Configurable::Configurable(const ConfigurableParams *p)
      cache_mac(p->cache_mac),
      eager_fetch(p->eager_fetch),
      bonsai(p->bonsai),
+     secure(p->secure),
      cipherEvent([this] { cipherEngine(); }, name()),
      macEvent([this] { macEngine(); }, name()),
      parallelReadRespondEvent([this] { respondParallelRead(); }, name()),
@@ -104,6 +105,7 @@ Configurable::startup()
 
     // hashing
     //secure = secure | 1;
+    printf("\n\nsecure value: %d\n\n", secure);
 
     // encryption
     //secure = secure | (1 << 1);

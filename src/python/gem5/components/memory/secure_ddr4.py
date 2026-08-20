@@ -87,6 +87,7 @@ class SecureDDR4(AbstractMemorySystem):
         bonsai: bool = True,
         l3_size: str = "1MB",
         protocol: str = "never",
+        secure: int = 7,
     ):
         """
         :param latency: the average request to response latency
@@ -140,6 +141,7 @@ class SecureDDR4(AbstractMemorySystem):
                     cache_mac=ch,
                     eager_fetch=ef,
                     bonsai=bonsai,
+                    secure=secure,
                 )
             elif secure_memory_class == MCX:
                 self.secure_memory = MCX(
@@ -303,6 +305,7 @@ def ConfigurableMemory(
     cache_mac: Optional[bool] = False,
     eager_fetch: Optional[bool] = True,
     bonsai: Optional[bool] = True,
+    secure: Optional[int] = 7, # security parameter
 ) -> AbstractMemorySystem:
     # arity describes counter arity (number of data blocks per counter block)
     return SecureDDR4(
@@ -315,6 +318,7 @@ def ConfigurableMemory(
         ch=cache_mac,
         ef=eager_fetch,
         bonsai=bonsai,
+        secure=secure,
     )
 
 def MCXSecureMemory(

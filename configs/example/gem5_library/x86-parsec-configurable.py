@@ -229,12 +229,13 @@ from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarc
 # Memory: Dual Channel DDR4 2400 DRAM device.
 # The X86 board only supports 3 GiB of main memory.
 
-
 cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
     l1d_size="32KiB",
     l1i_size="32KiB",
     l2_size="128KiB",
 )
+
+# Assign memory module 
 
 if (args.memory == "integrity_tree"):
     memory = IntegrityTreeProtectedMemory(
@@ -267,7 +268,18 @@ elif (args.memory == "DDR4"):
         size="16GiB",
     )
 else: # Any kind of configurable memory uses the configurable module
-    print(f"\nRunning memory module: {args.memory}\n")
+    # Creating secure flag
+    secure_flag = 0 # no security
+    if (args.memory == "hashing_only"): secure_flag = 1
+    elif (args.memory == "encryption_only"): secure_flag = 2
+    elif (args.memory == "hashing+encryption"): secure_flag = 3
+    elif ( args.memory == "integrity_tree"): secure_flag = 4
+    elif ( args.memory == "hashing+integrity"): secure_flag = 5
+    elif ( args.memory == "encryption+integrity"): secure_flag = 6 
+    elif ( args.memory == "full_security"): secure_flag = 7
+
+    print(f"\nRunning memory module: {args.memory}\n  secure_flag: {secure_flag}\n\n")
+ 
     memory = ConfigurableMemory(
         size="16GiB",
         latency=args.encryption_latency,
@@ -277,7 +289,7 @@ else: # Any kind of configurable memory uses the configurable module
         cache_mac=args.cache_mac,
         eager_fetch=args.eager_fetch,
         bonsai=not args.no_bonsai,
-        secure=args.memory,
+        secure=secure_flag,
         #l3_cache_size=args.l3_size,
         #protocol=args.mcx_policy,
     )
