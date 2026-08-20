@@ -100,6 +100,7 @@ memory_choices = [
     "integrity_tree", # sam's implementation
     "no_security",
     "mcx",
+    "DDR4", # Regular DDR4 module from gem5
 ]
 
 # Following are the input size.
@@ -235,23 +236,7 @@ cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
     l2_size="128KiB",
 )
 
-print(f"\nRunning memory module: {args.memory}\n")
-
-if (args.memory == "configurable"):
-    memory = ConfigurableMemory(
-        size="16GiB",
-        latency=args.encryption_latency,
-        cache=not args.no_metadata_cache,
-        cache_size=args.metadata_cache_size,
-        arity=args.arity,
-        cache_mac=args.cache_mac,
-        eager_fetch=args.eager_fetch,
-        bonsai=not args.no_bonsai,
-        secure=args.memory,
-        #l3_cache_size=args.l3_size,
-        #protocol=args.mcx_policy,
-    )
-elif (args.memory == "integrity_tree"):
+if (args.memory == "integrity_tree"):
     memory = IntegrityTreeProtectedMemory(
         size="16GiB",
         latency=args.encryption_latency,
@@ -277,9 +262,24 @@ elif (args.memory == "mcx"):
         l3_cache_size=args.l3_size,
         protocol=args.mcx_policy,
     )
-else:
+elif (args.memory == "DDR4"):
     memory =DualChannelDDR4_2400( 
         size="16GiB",
+    )
+else: # Any kind of configurable memory uses the configurable module
+    print(f"\nRunning memory module: {args.memory}\n")
+    memory = ConfigurableMemory(
+        size="16GiB",
+        latency=args.encryption_latency,
+        cache=not args.no_metadata_cache,
+        cache_size=args.metadata_cache_size,
+        arity=args.arity,
+        cache_mac=args.cache_mac,
+        eager_fetch=args.eager_fetch,
+        bonsai=not args.no_bonsai,
+        secure=args.memory,
+        #l3_cache_size=args.l3_size,
+        #protocol=args.mcx_policy,
     )
 
 # Here we setup the processor. This is a special switchable processor in which
