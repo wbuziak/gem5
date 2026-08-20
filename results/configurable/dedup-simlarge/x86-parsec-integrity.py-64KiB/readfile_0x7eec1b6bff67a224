@@ -1,1 +1,0 @@
-cd /home/gem5/parsec-benchmark;source env.sh;parsecmgmt -a run -p dedup -c gcc-hooks -i simlarge         -n 4;sleep 5;m5 exit;
