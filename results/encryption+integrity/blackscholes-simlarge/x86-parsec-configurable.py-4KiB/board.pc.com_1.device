@@ -399,7 +399,3 @@ in_64K.txt
 [PARSEC] [---------- Beginning of output ----------]
 PARSEC Benchmark Suite Version 3.0-beta-20150206
 [HOOKS] PARSEC Hooks Version 1.2
-Num of Options: 65536
-Num of Runs: 100
-Size of data: 2621440
-[HOOKS] Entering ROI
