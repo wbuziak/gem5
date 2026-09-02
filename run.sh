@@ -10,7 +10,7 @@ export CONFIG=$5 # architecture / name / mem-module we are testing (config file)
 # redirect the stats to a folder with the following naming convention
 RESULTS_DIR=$CUR_DIR/results/$MEMORY/$BMK-$SIZE/$CONFIG-$META_SIZE
 
-$CUR_DIR/build/X86/gem5.opt -d $RESULTS_DIR $CUR_DIR/configs/example/gem5_library/$CONFIG --benchmark $BMK --size $SIZE --metadata_cache_size $META_SIZE --memory $MEMORY --l3_size 256KiB --mcx_policy never | tee $RESULTS_DIR/output.txt
+$CUR_DIR/build/X86/gem5.opt -d $RESULTS_DIR $CUR_DIR/configs/example/gem5_library/$CONFIG --benchmark $BMK --size $SIZE --metadata_cache_size $META_SIZE --memory $MEMORY --l3_size 256KiB --mcx_policy never 2>&1 | tee $RESULTS_DIR/output.txt
 
 # save the config file
 cp $CUR_DIR/configs/example/gem5_library/$CONFIG $RESULTS_DIR/
