@@ -370,7 +370,7 @@ Configurable::handleMetadataCacheMiss(PacketPtr pkt)
     assert(!isMac(pkt->getAddr()) || cache_mac);
     assert(secure);
 
-    if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1]) {
+    if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1] && secure & 1) {
         // this is a tree node, we need to track the miss
         if ((!isMac(pkt->getAddr()) && !isCounter(pkt->getAddr())) ||
             (bonsai && isCounter(pkt->getAddr())) ||
@@ -559,7 +559,11 @@ Configurable::handleTreeResponse(PacketPtr pkt)
         {
             if (parent_addr == (*it)->getAddr()) {
                 assert(!authenticated);
-                initiateMac(pkt);
+                if (secure & 1) {
+                  // Only go through mac process if hashing
+                  // We will just assume authenticated otherwise
+                  initiateMac(pkt);
+                }
                 authenticated = true;
 
                 // remove from authentication structure
@@ -620,7 +624,11 @@ Configurable::handleTreeResponse(PacketPtr pkt)
             if (calculateParentAddress((*it)->getAddr()) == pkt->getAddr()) {
                 // authenticate the child node
                 assert((*it)->isWrite() || (*it)->isResponse());
-                initiateMac(*it);
+                if (secure & 1) {
+                  // Only go through mac process if hashing
+                  // We will just authenticate otherwise
+                  initiateMac(*it);
+                }
                 child_authenticated = true;
 
                 // remove from both authentication structures
@@ -646,9 +654,11 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 
         if (isCounter(pkt->getAddr())) {
             assert(bonsai);
+            assert(secure & (1 << 1));
             assert(handleCounterResponse(pkt));
         } else if (isMac(pkt->getAddr())) {
             assert(!bonsai);
+            assert(secure & 1);
             assert(handleMacResponse(pkt));
         } else {
             if (pkt->isRead() && !child_authenticated) {
