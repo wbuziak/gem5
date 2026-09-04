@@ -3720,8 +3720,7 @@
                     "role": "GEM5 REQUESTOR",
                     "peer": [
                         "board.bridge.cpu_side_port",
-                        "board.memory.mem_ctrl0.port",
-                        "board.memory.mem_ctrl1.port",
+                        "board.memory.secure_memory.cpu_side",
                         "board.processor.start0.core.interrupts.pio",
                         "board.processor.start0.core.interrupts.int_responder",
                         "board.processor.start1.core.interrupts.pio",
@@ -3890,7 +3889,7 @@
                         "data_clock_sync": false,
                         "device_bus_width": 8,
                         "device_rowbuffer_size": 1024,
-                        "device_size": 1073741824,
+                        "device_size": 3221225472,
                         "devices_per_rank": 8,
                         "dll": true,
                         "enable_dram_powerdown": false,
@@ -4000,7 +3999,7 @@
                     "write_low_thresh_perc": 50,
                     "port": {
                         "role": "GEM5 RESPONDER",
-                        "peer": "board.cache_hierarchy.membus.mem_side_ports[1]",
+                        "peer": "board.memory.to_mem.mem_side_ports[0]",
                         "is_source": "False"
                     }
                 },
@@ -4053,7 +4052,7 @@
                         "data_clock_sync": false,
                         "device_bus_width": 8,
                         "device_rowbuffer_size": 1024,
-                        "device_size": 1073741824,
+                        "device_size": 13958643712,
                         "devices_per_rank": 8,
                         "dll": true,
                         "enable_dram_powerdown": false,
@@ -4163,11 +4162,279 @@
                     "write_low_thresh_perc": 50,
                     "port": {
                         "role": "GEM5 RESPONDER",
-                        "peer": "board.cache_hierarchy.membus.mem_side_ports[2]",
+                        "peer": "board.memory.to_mem.mem_side_ports[1]",
                         "is_source": "False"
                     }
                 }
-            ]
+            ],
+            "metadata_cache": {
+                "type": "Cache",
+                "cxx_class": "gem5::Cache",
+                "name": "metadata_cache",
+                "path": "board.memory.metadata_cache",
+                "addr_ranges": [
+                    "0:18446744073709551615"
+                ],
+                "assoc": 8,
+                "clk_domain": "board.clk_domain",
+                "clusivity": "mostly_incl",
+                "compressor": null,
+                "data_latency": 1,
+                "demand_mshr_reserve": 1,
+                "eventq_index": 0,
+                "is_read_only": false,
+                "max_miss_count": 0,
+                "move_contractions": true,
+                "mshrs": 16,
+                "partitioning_manager": null,
+                "power_model": [],
+                "power_state": {
+                    "type": "PowerState",
+                    "cxx_class": "gem5::PowerState",
+                    "name": "power_state",
+                    "path": "board.memory.metadata_cache.power_state",
+                    "clk_gate_bins": 20,
+                    "clk_gate_max": 1000000000000,
+                    "clk_gate_min": 1000,
+                    "default_state": "UNDEFINED",
+                    "eventq_index": 0,
+                    "leaders": [],
+                    "possible_states": []
+                },
+                "prefetcher": {
+                    "type": "StridePrefetcher",
+                    "cxx_class": "gem5::prefetch::Stride",
+                    "name": "prefetcher",
+                    "path": "board.memory.metadata_cache.prefetcher",
+                    "block_size": 64,
+                    "cache_snoop": false,
+                    "clk_domain": "board.clk_domain",
+                    "confidence_counter_bits": 3,
+                    "confidence_threshold": 50,
+                    "degree": 4,
+                    "distance": 0,
+                    "eventq_index": 0,
+                    "initial_confidence": 4,
+                    "latency": 1,
+                    "max_prefetch_requests_with_pending_translation": 32,
+                    "on_data": true,
+                    "on_inst": false,
+                    "on_miss": false,
+                    "on_read": true,
+                    "on_write": true,
+                    "page_bytes": 4096,
+                    "power_model": [],
+                    "power_state": {
+                        "type": "PowerState",
+                        "cxx_class": "gem5::PowerState",
+                        "name": "power_state",
+                        "path": "board.memory.metadata_cache.prefetcher.power_state",
+                        "clk_gate_bins": 20,
+                        "clk_gate_max": 1000000000000,
+                        "clk_gate_min": 1000,
+                        "default_state": "UNDEFINED",
+                        "eventq_index": 0,
+                        "leaders": [],
+                        "possible_states": []
+                    },
+                    "prefetch_on_access": false,
+                    "prefetch_on_pf_hit": true,
+                    "queue_filter": true,
+                    "queue_size": 32,
+                    "queue_squash": true,
+                    "sys": "board",
+                    "table_assoc": 4,
+                    "table_entries": 64,
+                    "table_indexing_policy": {
+                        "type": "StridePrefetcherHashedSetAssociative",
+                        "cxx_class": "gem5::prefetch::StridePrefetcherHashedSetAssociative",
+                        "name": "table_indexing_policy",
+                        "path": "board.memory.metadata_cache.prefetcher.table_indexing_policy",
+                        "assoc": 4,
+                        "entry_size": 1,
+                        "eventq_index": 0,
+                        "size": 64
+                    },
+                    "table_replacement_policy": {
+                        "type": "RandomRP",
+                        "cxx_class": "gem5::replacement_policy::Random",
+                        "name": "table_replacement_policy",
+                        "path": "board.memory.metadata_cache.prefetcher.table_replacement_policy",
+                        "eventq_index": 0
+                    },
+                    "tag_prefetch": true,
+                    "throttle_control_percentage": 0,
+                    "use_cache_line_address": true,
+                    "use_requestor_id": true,
+                    "use_virtual_addresses": false
+                },
+                "replace_expansions": true,
+                "replacement_policy": {
+                    "type": "LRURP",
+                    "cxx_class": "gem5::replacement_policy::LRU",
+                    "name": "replacement_policy",
+                    "path": "board.memory.metadata_cache.replacement_policy",
+                    "eventq_index": 0
+                },
+                "response_latency": 1,
+                "sequential_access": false,
+                "size": 4096,
+                "system": "board",
+                "tag_latency": 1,
+                "tags": {
+                    "type": "BaseSetAssoc",
+                    "cxx_class": "gem5::BaseSetAssoc",
+                    "name": "tags",
+                    "path": "board.memory.metadata_cache.tags",
+                    "assoc": 8,
+                    "block_size": 64,
+                    "clk_domain": "board.clk_domain",
+                    "entry_size": 64,
+                    "eventq_index": 0,
+                    "indexing_policy": {
+                        "type": "TaggedSetAssociative",
+                        "cxx_class": "gem5::TaggedSetAssociative",
+                        "name": "indexing_policy",
+                        "path": "board.memory.metadata_cache.tags.indexing_policy",
+                        "assoc": 8,
+                        "entry_size": 64,
+                        "eventq_index": 0,
+                        "size": 4096
+                    },
+                    "partitioning_manager": null,
+                    "power_model": [],
+                    "power_state": {
+                        "type": "PowerState",
+                        "cxx_class": "gem5::PowerState",
+                        "name": "power_state",
+                        "path": "board.memory.metadata_cache.tags.power_state",
+                        "clk_gate_bins": 20,
+                        "clk_gate_max": 1000000000000,
+                        "clk_gate_min": 1000,
+                        "default_state": "UNDEFINED",
+                        "eventq_index": 0,
+                        "leaders": [],
+                        "possible_states": []
+                    },
+                    "replacement_policy": "board.memory.metadata_cache.replacement_policy",
+                    "sequential_access": false,
+                    "size": 4096,
+                    "system": "board",
+                    "tag_latency": 1,
+                    "warmup_percentage": 0
+                },
+                "tgts_per_mshr": 20,
+                "warmup_percentage": 0,
+                "write_allocator": null,
+                "write_buffers": 8,
+                "writeback_clean": false,
+                "cpu_side": {
+                    "role": "GEM5 RESPONDER",
+                    "peer": "board.memory.secure_memory.metadata_request_port",
+                    "is_source": "False"
+                },
+                "mem_side": {
+                    "role": "GEM5 REQUESTOR",
+                    "peer": "board.memory.secure_memory.metadata_response_port",
+                    "is_source": "True"
+                }
+            },
+            "secure_memory": {
+                "type": "Configurable",
+                "cxx_class": "gem5::memory::Configurable",
+                "name": "secure_memory",
+                "path": "board.memory.secure_memory",
+                "bonsai": true,
+                "cache": true,
+                "cache_mac": false,
+                "counter_arity": 64,
+                "eager_fetch": false,
+                "eventq_index": 0,
+                "hash_latency": 2,
+                "latency": 53,
+                "mac_arity": 8,
+                "secure": 1,
+                "tree_arity": 8,
+                "cpu_side": {
+                    "role": "GEM5 RESPONDER",
+                    "peer": "board.cache_hierarchy.membus.mem_side_ports[1]",
+                    "is_source": "False"
+                },
+                "mem_side": {
+                    "role": "GEM5 REQUESTOR",
+                    "peer": "board.memory.to_mem.cpu_side_ports[0]",
+                    "is_source": "True"
+                },
+                "metadata_request_port": {
+                    "role": "GEM5 REQUESTOR",
+                    "peer": "board.memory.metadata_cache.cpu_side",
+                    "is_source": "True"
+                },
+                "metadata_response_port": {
+                    "role": "GEM5 RESPONDER",
+                    "peer": "board.memory.metadata_cache.mem_side",
+                    "is_source": "False"
+                }
+            },
+            "to_mem": {
+                "type": "CoherentXBar",
+                "cxx_class": "gem5::CoherentXBar",
+                "name": "to_mem",
+                "path": "board.memory.to_mem",
+                "clk_domain": "board.clk_domain",
+                "eventq_index": 0,
+                "forward_latency": 0,
+                "frontend_latency": 1,
+                "header_latency": 1,
+                "max_outstanding_snoops": 512,
+                "max_routing_table_size": 512,
+                "point_of_coherency": false,
+                "point_of_unification": true,
+                "power_model": [],
+                "power_state": {
+                    "type": "PowerState",
+                    "cxx_class": "gem5::PowerState",
+                    "name": "power_state",
+                    "path": "board.memory.to_mem.power_state",
+                    "clk_gate_bins": 20,
+                    "clk_gate_max": 1000000000000,
+                    "clk_gate_min": 1000,
+                    "default_state": "UNDEFINED",
+                    "eventq_index": 0,
+                    "leaders": [],
+                    "possible_states": []
+                },
+                "response_latency": 1,
+                "snoop_filter": {
+                    "type": "SnoopFilter",
+                    "cxx_class": "gem5::SnoopFilter",
+                    "name": "snoop_filter",
+                    "path": "board.memory.to_mem.snoop_filter",
+                    "eventq_index": 0,
+                    "lookup_latency": 0,
+                    "max_capacity": 8388608,
+                    "system": "board"
+                },
+                "snoop_response_latency": 1,
+                "system": "board",
+                "use_default_range": false,
+                "width": 32,
+                "cpu_side_ports": {
+                    "role": "GEM5 RESPONDER",
+                    "peer": [
+                        "board.memory.secure_memory.mem_side"
+                    ],
+                    "is_source": "False"
+                },
+                "mem_side_ports": {
+                    "role": "GEM5 REQUESTOR",
+                    "peer": [
+                        "board.memory.mem_ctrl0.port",
+                        "board.memory.mem_ctrl1.port"
+                    ],
+                    "is_source": "True"
+                }
+            }
         },
         "pc": {
             "type": "Pc",
@@ -5157,12 +5424,12 @@
                                 },
                                 "int_responder": {
                                     "role": "GEM5 RESPONDER",
-                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[4]",
+                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[3]",
                                     "is_source": "False"
                                 },
                                 "pio": {
                                     "role": "GEM5 RESPONDER",
-                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[3]",
+                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[2]",
                                     "is_source": "False"
                                 }
                             }
@@ -5439,12 +5706,12 @@
                                 },
                                 "int_responder": {
                                     "role": "GEM5 RESPONDER",
-                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[6]",
+                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[5]",
                                     "is_source": "False"
                                 },
                                 "pio": {
                                     "role": "GEM5 RESPONDER",
-                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[5]",
+                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[4]",
                                     "is_source": "False"
                                 }
                             }
@@ -5721,12 +5988,12 @@
                                 },
                                 "int_responder": {
                                     "role": "GEM5 RESPONDER",
-                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[8]",
+                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[7]",
                                     "is_source": "False"
                                 },
                                 "pio": {
                                     "role": "GEM5 RESPONDER",
-                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[7]",
+                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[6]",
                                     "is_source": "False"
                                 }
                             }
@@ -6003,12 +6270,12 @@
                                 },
                                 "int_responder": {
                                     "role": "GEM5 RESPONDER",
-                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[10]",
+                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[9]",
                                     "is_source": "False"
                                 },
                                 "pio": {
                                     "role": "GEM5 RESPONDER",
-                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[9]",
+                                    "peer": "board.cache_hierarchy.membus.mem_side_ports[8]",
                                     "is_source": "False"
                                 }
                             }
