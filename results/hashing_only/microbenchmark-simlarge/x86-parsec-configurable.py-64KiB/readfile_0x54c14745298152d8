@@ -1,1 +1,0 @@
-cd;cd repos/microbenchmark;./bin/micro 5000 536870900;sleep 5;m5 exit;
