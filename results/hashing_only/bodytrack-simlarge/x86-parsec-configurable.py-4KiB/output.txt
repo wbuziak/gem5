@@ -1,0 +1,32 @@
+Global frequency set at 1000000000000 ticks per second
+      0: board.pc.south_bridge.cmos.rtc: Real-time clock set to Sun Jan  1 00:00:00 2012
+gem5 Simulator System.  https://www.gem5.org
+gem5 is copyrighted software; use the --copyright option for details.
+
+gem5 version 24.1.0.2
+gem5 compiled Sep  2 2026 19:50:59
+gem5 started Sep  2 2026 19:53:31
+gem5 executing on iris-arm-server-6, pid 2837615
+command line: /home/wbuziak/repos/gem5/build/X86/gem5.opt -d /home/wbuziak/repos/gem5/results/hashing_only/bodytrack-simlarge/x86-parsec-configurable.py-4KiB /home/wbuziak/repos/gem5/configs/example/gem5_library/x86-parsec-configurable.py --benchmark bodytrack --size simlarge --metadata_cache_size 4KiB --memory hashing_only --l3_size 256KiB --mcx_policy never
+
+
+Running memory module: hashing_only
+  secure_flag: 1
+
+
+Running the simulation
+
+
+secure value: 1
+
+Done booting Linux
+Resetting stats at the start of ROI!
+switching cpus
+
+Maximum instructions reached
+Dump stats at the end of the ROI!
+
+All simulation events were successful.
+
+Performance statistics:
+Simulated time in ROI: N/A (Simulation exited before ROI completed)
