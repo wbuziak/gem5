@@ -14,19 +14,19 @@ gem5 is copyrighted software; use the --copyright option for details.
 
 gem5 version 24.1.0.2
 gem5 compiled Sep  2 2026 19:47:21
-gem5 started Sep  4 2026 15:55:14
-gem5 executing on iris-arm-server-5, pid 732605
-command line: /home/wbuziak/repos/gem5/build/X86/gem5.opt -d /home/wbuziak/repos/gem5/results/encryption+integrity/canneal-simlarge/x86-parsec-configurable.py-4KiB /home/wbuziak/repos/gem5/configs/example/gem5_library/x86-parsec-configurable.py --benchmark canneal --size simlarge --metadata_cache_size 4KiB --memory encryption+integrity --l3_size 256KiB --mcx_policy never
+gem5 started Sep  5 2026 12:35:27
+gem5 executing on iris-arm-server-5, pid 763994
+command line: /home/wbuziak/repos/gem5/build/X86/gem5.opt -d /home/wbuziak/repos/gem5/results/no_security/canneal-simlarge/x86-parsec-configurable.py-4KiB /home/wbuziak/repos/gem5/configs/example/gem5_library/x86-parsec-configurable.py --benchmark canneal --size simlarge --metadata_cache_size 4KiB --memory no_security --l3_size 256KiB --mcx_policy never
 
 
-Running memory module: encryption+integrity
-  secure_flag: 6
+Running memory module: no_security
+  secure_flag: 0
 
 
 Running the simulation
 
 
-secure value: 6
+secure value: 0
 
 src/sim/simulate.cc:199: info: Entering event queue @ 0.  Starting simulation...
 build/X86/arch/x86/generated/exec-ns.cc.inc:27: warn: instruction 'fninit' unimplemented
