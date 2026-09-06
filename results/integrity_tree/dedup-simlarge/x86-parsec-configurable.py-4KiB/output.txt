@@ -14,8 +14,8 @@ gem5 is copyrighted software; use the --copyright option for details.
 
 gem5 version 24.1.0.2
 gem5 compiled Sep  2 2026 20:11:13
-gem5 started Sep  3 2026 02:54:50
-gem5 executing on iris-arm-server-8, pid 1225347
+gem5 started Sep  5 2026 02:09:57
+gem5 executing on iris-arm-server-8, pid 1297943
 command line: /home/wbuziak/repos/gem5/build/X86/gem5.opt -d /home/wbuziak/repos/gem5/results/integrity_tree/dedup-simlarge/x86-parsec-configurable.py-4KiB /home/wbuziak/repos/gem5/configs/example/gem5_library/x86-parsec-configurable.py --benchmark dedup --size simlarge --metadata_cache_size 4KiB --memory integrity_tree --l3_size 256KiB --mcx_policy never
 
 Running the simulation
