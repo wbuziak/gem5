@@ -94,10 +94,7 @@ memory_choices = [
     "hashing_only",
     "encryption_only",
     "hashing+encryption",
-    "hashing+integrity",
-    "encryption+integrity",
     "full_security", # should be identical to integrity_tree
-    "integrity_tree", # sam's implementation
     "no_security",
     "mcx",
     "DDR4", # Regular DDR4 module from gem5

@@ -3,14 +3,11 @@
 export BENCHMARK=$1
 
 configs="
+  no_security
   hashing_only
   encryption_only
-  integrity_tree
   hashing+encryption
-  hashing+integrity
-  encryption+integrity
   full_security
-  no_security
   "
 
 for curr in $configs; do
