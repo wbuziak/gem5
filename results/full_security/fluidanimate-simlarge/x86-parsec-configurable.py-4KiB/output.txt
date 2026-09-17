@@ -14,8 +14,8 @@ gem5 is copyrighted software; use the --copyright option for details.
 
 gem5 version 24.1.0.2
 gem5 compiled Sep  2 2026 19:43:36
-gem5 started Sep  3 2026 14:37:26
-gem5 executing on iris-arm-server-4, pid 4098078
+gem5 started Sep 17 2026 14:51:27
+gem5 executing on iris-arm-server-4, pid 584540
 command line: /home/wbuziak/repos/gem5/build/X86/gem5.opt -d /home/wbuziak/repos/gem5/results/full_security/fluidanimate-simlarge/x86-parsec-configurable.py-4KiB /home/wbuziak/repos/gem5/configs/example/gem5_library/x86-parsec-configurable.py --benchmark fluidanimate --size simlarge --metadata_cache_size 4KiB --memory full_security --l3_size 256KiB --mcx_policy never
 
 
