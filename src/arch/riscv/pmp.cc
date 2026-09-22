@@ -54,6 +54,10 @@ PMP::PMP(const Params &params) :
     hasLockEntry(false)
 {
     pmpTable.resize(pmpEntries);
+    //printf("\n\nPMP size of: %ld\n\n", pmpTable.size());
+    memCtrl = (gem5::memory::Configurable *) SimObject::find("board.memory.secure_memory");
+    if (memCtrl == NULL) { printf("\n\nmemCtrl pointer is NULL\n\n"); }
+    memCtrl->epmpTable.resize(pmpEntries);
 }
 
 Fault
@@ -67,6 +71,7 @@ PMP::pmpCheck(const RequestPtr &req, BaseMMU::Mode mode,
     if (req->hasVaddr()) {
         DPRINTF(PMP, "Checking pmp permissions for va: %#x , pa: %#x\n",
                 req->getVaddr(), req->getPaddr());
+
     }
     else { // this access is corresponding to a page table walk
         DPRINTF(PMP, "Checking pmp permissions for pa: %#x\n",
@@ -147,6 +152,12 @@ PMP::pmpGetAField(uint8_t cfg)
     return a & 0x03;
 }
 
+bool
+PMP::ifEncrypt(uint8_t this_cfg)
+{
+    // Check the 5th bit of pmpcfg register 
+    return 1 && (this_cfg >> 5);
+}
 
 bool
 PMP::pmpUpdateCfg(uint32_t pmp_index, uint8_t this_cfg)
@@ -167,6 +178,21 @@ PMP::pmpUpdateCfg(uint32_t pmp_index, uint8_t this_cfg)
     }
     pmpTable[pmp_index].pmpCfg = this_cfg;
     pmpUpdateRule(pmp_index);
+
+    // Check for encryption
+    if (ifEncrypt(this_cfg)) {
+      // Send to memory encryption engine
+      printf("pmpcfg: %u -> encrypt bit set\n Updating CFG in ePMPTable\n", this_cfg);
+
+      // update ePMPTable within memory controller
+      memCtrl->epmpTable[pmp_index].pmpCfg = this_cfg;
+    }
+    else {
+      // Send to external memory controller
+      printf("pmpcfg: %u -> encrypt bit is not set\n NOT UPDATING ePMPTable\n", this_cfg);
+      // printf("\n\nSanity Check - MEE->max_active_requests: %d\n\n", mee->max_active_requests);
+    }
+
     return true;
 }
 
@@ -222,6 +248,13 @@ PMP::pmpUpdateRule(uint32_t pmp_index)
 
     if (hasLockEntry) {
         DPRINTF(PMP, "Find lock entry\n");
+    }
+
+    // update ePMP table
+    if (ifEncrypt(pmpTable[pmp_index].pmpCfg)) {
+      // Send to MemCtrl - encrypt bit is set
+      printf("pmpcfg: %u -> encrypt bit set\n Updating ADDRESS in ePMPTable\n", this_cfg);
+      memCtrl->epmpTable[pmp_index].rawAddr = this_addr;
     }
 }
 

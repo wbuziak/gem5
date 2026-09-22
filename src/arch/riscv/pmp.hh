@@ -37,6 +37,7 @@
 #include "mem/packet.hh"
 #include "params/PMP.hh"
 #include "sim/sim_object.hh"
+#include "mem/secure_memory/configurable.hh"
 
 /**
  * @file
@@ -59,6 +60,10 @@ class PMP : public SimObject
   public:
     PARAMS(PMP);
     PMP(const Params &params);
+
+    /** a pointer to a memory encryption engine in order to access ePMP data **/
+
+    gem5::memory::Configurable *memCtrl;
 
   private:
     /** maximum number of entries in the pmp table */
@@ -150,6 +155,13 @@ class PMP : public SimObject
      * @returns true if update pmpaddri success
      */
     bool pmpUpdateAddr(uint32_t pmp_index, Addr this_addr);
+
+    /**
+     * Check the CSR if you need to send to the MEC
+     * (Memory Encryption Engine/Controller) or straight
+     * to the external memory controller
+    **/
+    bool ifEncrypt(uint8_t this_cfg);
 
     /**
      * pmpReset reset when reset signal in trigger from

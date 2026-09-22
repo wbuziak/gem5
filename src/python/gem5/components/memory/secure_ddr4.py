@@ -56,6 +56,7 @@ from m5.objects import (
     CounterModeEncryption,
     DirectEncryption,
     IntegrityTree,
+    Configurable,
     L2XBar,
     MemCtrl,
     Port,
@@ -86,6 +87,7 @@ class SecureDDR4(AbstractMemorySystem):
         bonsai: bool = True,
         l3_size: str = "1MB",
         protocol: str = "never",
+        secure: int = 4,
     ):
         """
         :param latency: the average request to response latency
@@ -134,6 +136,15 @@ class SecureDDR4(AbstractMemorySystem):
                     cache_mac=ch,
                     eager_fetch=ef,
                     bonsai=bonsai,
+                )
+            elif secure_memory_class == Configurable:
+                self.secure_memory = Configurable(
+                    latency=latency,
+                    tree_arity=arity,
+                    cache_mac=ch,
+                    eager_fetch=ef,
+                    bonsai=bonsai,
+                    secure=secure,
                 )
             elif secure_memory_class == MCX:
                 self.secure_memory = MCX(
@@ -289,6 +300,31 @@ def IntegrityTreeProtectedMemory(
         bonsai=bonsai,
     )
 
+
+def ConfigurableMemory(
+    size: Optional[str] = "32MB",
+    latency: Optional[int] = 53,
+    arity: Optional[int] = 64,
+    cache: Optional[bool] = True,
+    cache_size: Optional[str] = "64KiB",
+    cache_mac: Optional[bool] = False,
+    eager_fetch: Optional[bool] = True,
+    bonsai: Optional[bool] = True,
+    secure: Optional[int] = 7, # security parameter
+) -> AbstractMemorySystem:
+    # arity describes counter arity (number of data blocks per counter block)
+    return SecureDDR4(
+        Configurable,
+        size=size,
+        latency=latency,
+        arity=arity,
+        cache=cache,
+        cache_size=cache_size,
+        ch=cache_mac,
+        ef=eager_fetch,
+        bonsai=bonsai,
+        secure=secure,
+    )
 
 def MCXSecureMemory(
     size: Optional[str] = "32MB",

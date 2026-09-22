@@ -61,6 +61,7 @@ from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarc
 )
 from gem5.components.boards.riscv_board import RiscvBoard
 from gem5.components.memory.secure_ddr4 import IntegrityTreeProtectedMemory
+from gem5.components.memory.secure_ddr4 import ConfigurableMemory
 from gem5.components.memory.secure_ddr4 import DirectEncryptedMemory
 from gem5.components.memory import DualChannelDDR4_2400
 from gem5.components.processors.cpu_types import CPUTypes
@@ -79,22 +80,61 @@ from gem5.simulate.exit_event import ExitEvent
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
 
-parser = argparse.ArgumentParser(
-    description="An example configuration script to run the gapbs benchmarks."
-)
 
-# The only positional argument accepted is the benchmark name in this script.
+benchmark_choices = [
+    "blackscholes",
+    "bodytrack",
+    "canneal",
+    "dedup",
+    "facesim",
+    "ferret",
+    "fluidanimate",
+    "freqmine",
+    "raytrace",
+    "streamcluster",
+    "swaptions",
+    "vips",
+    "x264",
+    "microbenchmark",
+]
+
+# Memory module choices
+
+memory_choices = [
+    "configurable",
+    "hashing_only",
+    "encryption_only",
+    "hashing+encryption",
+    "full_security", # should be identical to integrity_tree
+    "no_security",
+    "mcx",
+    "DDR4", # Regular DDR4 module from gem5
+]
+
+# Following are the input size.
 
 size_choices = ["simsmall", "simmedium", "simlarge"]
 
-benchmarks = ["bfs"]
+parser = argparse.ArgumentParser(
+    description="An example configuration script to run the npb benchmarks."
+)
+
+# The arguments accepted are the benchmark name and the simulation size.
 
 parser.add_argument(
     "--benchmark",
     type=str,
     required=True,
     help="Input the benchmark program to execute.",
-    choices=benchmarks,
+    choices=benchmark_choices,
+)
+
+parser.add_argument(
+    "--memory",
+    type=str,
+    required=True,
+    help="Input the memory module to run.",
+    choices=memory_choices,
 )
 
 parser.add_argument(
@@ -158,6 +198,33 @@ parser.add_argument(
     default=False,
 )
 
+parser.add_argument(
+    "--l3_size",
+    type=str,
+    required=True,
+    default="1MB",
+    help="L3 size for MCX",
+)
+
+parser.add_argument(
+    "--mcx_policy",
+    type=str,
+    required=True,
+    default="never",
+    choices=[
+        "insecure",
+        "never",
+        "always",
+        "counter",
+        "hotspot",
+        "read-write",
+        "approx-ancestors",
+        "approx-ancestors-v2",
+        "l3-hitrate",
+    ],
+    help="MCX policy",
+)
+
 args = parser.parse_args()
 
 cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
@@ -166,16 +233,66 @@ cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
     l2_size="128KiB",
 )
 
-memory = IntegrityTreeProtectedMemory(
-    size="16GiB",
-    latency=args.encryption_latency,
-    cache=not args.no_metadata_cache,
-    cache_size=args.metadata_cache_size,
-    arity=args.arity,
-    cache_mac=args.cache_mac,
-    eager_fetch=args.eager_fetch,
-    bonsai=not args.no_bonsai,
-)
+# Assign memory module
+
+if (args.memory == "integrity_tree"):
+    memory = IntegrityTreeProtectedMemory(
+        size="16GiB",
+        latency=args.encryption_latency,
+        cache=not args.no_metadata_cache,
+        cache_size=args.metadata_cache_size,
+        arity=args.arity,
+        cache_mac=args.cache_mac,
+        eager_fetch=args.eager_fetch,
+        bonsai=not args.no_bonsai,
+        #l3_cache_size=args.l3_size,
+        #protocol=args.mcx_policy,
+    )
+elif (args.memory == "mcx"):
+    memory = MCXSecureMemory(
+        size="16GiB",
+        latency=args.encryption_latency,
+        cache=not args.no_metadata_cache,
+        metadata_cache_size=args.metadata_cache_size,
+        arity=args.arity,
+        cache_mac=args.cache_mac,
+        eager_fetch=args.eager_fetch,
+        bonsai=not args.no_bonsai,
+        l3_cache_size=args.l3_size,
+        protocol=args.mcx_policy,
+    )
+elif (args.memory == "DDR4"):
+    memory =DualChannelDDR4_2400(
+        size="16GiB",
+    )
+else: # Any kind of configurable memory uses the configurable module
+    # Creating secure flag
+    secure_flag = 0 # no security
+    if (args.memory == "hashing_only"): secure_flag = 1
+    elif (args.memory == "encryption_only"): secure_flag = 2
+    elif (args.memory == "hashing+encryption"): secure_flag = 3
+    elif ( args.memory == "full_security"): secure_flag = 7
+    elif ( args.memory == "no_security"): secure_flag = 0
+    else:
+      print(f"Incorrect memory module: {args.memory}")
+      exit
+
+    print(f"\nRunning memory module: {args.memory}\n  secure_flag: {secure_flag}\n\n")
+
+    memory = ConfigurableMemory(
+        size="16GiB",
+        latency=args.encryption_latency,
+        cache=not args.no_metadata_cache,
+        cache_size=args.metadata_cache_size,
+        arity=args.arity,
+        cache_mac=args.cache_mac,
+        eager_fetch=args.eager_fetch,
+        bonsai=not args.no_bonsai,
+        secure=secure_flag,
+        #l3_cache_size=args.l3_size,
+        #protocol=args.mcx_policy,
+    )
+
 
 # Here we setup the processor. This is a special switchable processor in which
 # a starting core type and a switch core type must be specified. Once a
@@ -209,49 +326,72 @@ board = RiscvBoard(
 # committed instructions till ROI ends (marked by `workend`). We then finish
 # executing the rest of the benchmark.
 
-command = (
-    f"ls;"
-    + "cd;"
-    + "ls;"
-    + "sleep 5;"
-    + "m5 exit;"
-)
+# micro-benchmark command
+if (args.benchmark == "microbenchmark"):
+    command = (
+        f"cd;"
+        f"cd repos/microbenchmark;"
+        f"./bin/micro 500000000 536870900;" # 500 million accesses on approximately 8GB
+        f"sleep 5;"
+        f"m5 exit;"
+    )
+else:
+# parsec command
+    command = (
+        f"cd /home/gem5/parsec-benchmark;"
+        + "source env.sh;"
+        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size}         -n 4;"
+        + "sleep 5;"
+        + "m5 exit;"
+    )
 
 board.set_kernel_disk_workload(
     bootloader=BootloaderResource(
         local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"
     ),
     kernel=KernelResource(
-        local_path=os.getcwd() + "/fs_files/linux-kernel-6.5.5"
+        local_path=os.getcwd() + "/fs_files/linux-6.5.5"
     ),
     # The x86-parsec image will be automatically downloaded to the
     # `~/.cache/gem5` directory if not already present.
     disk_image=DiskImageResource(
-        local_path=os.getcwd() + "/fs_files/riscv-ubuntu-20.04"
+        local_path=os.getcwd() + "/fs_files/riscv-ubuntu-22.04"
     ),
     readfile_contents=command,
 )
 
+# functions to handle different exit events during the simuation
 def handle_workbegin():
     print("Done booting Linux")
     print("Resetting stats at the start of ROI!")
     m5.stats.reset()
     processor.switch()
-    simulator.schedule_max_insts(500000000 / 4) # 500 million instructions
-    yield False  # E.g., continue the simulation.
+    simulator.schedule_max_insts(125000000) # 500 million instructions
+    yield False
 
 
 def handle_workend():
+    print()
+    print("Benchmark finished")
     print("Dump stats at the end of the ROI!")
     m5.stats.dump()
-    yield True  # Stop the simulation. We're done.
+    print()
+    yield True
 
+def handle_max_insts():
+    print()
+    print("Maximum instructions reached")
+    print("Dump stats at the end of the ROI!")
+    m5.stats.dump()
+    print()
+    yield True
 
 simulator = Simulator(
     board=board,
     on_exit_event={
         ExitEvent.WORKBEGIN: handle_workbegin(),
         ExitEvent.WORKEND: handle_workend(),
+        ExitEvent.MAX_INSTS: handle_max_insts(),
     },
 )
 
@@ -269,16 +409,10 @@ simulator.run()
 print("All simulation events were successful.")
 
 # We print the final simulation statistics.
-
-print("Done with the simulation")
 print()
 print("Performance statistics:")
-
-print("Simulated time in ROI: " + (str(simulator.get_roi_ticks()[0])))
-print(
-    "Ran a total of", simulator.get_current_tick() / 1e12, "simulated seconds"
-)
-print(
-    "Total wallclock time: %.2fs, %.2f min"
-    % (time.time() - globalStart, (time.time() - globalStart) / 60)
-)
+roi_ticks = simulator.get_roi_ticks()
+if roi_ticks:
+    print("Simulated time in ROI: " + str(roi_ticks[0]))
+else:
+    print("Simulated time in ROI: N/A (Simulation exited before ROI completed)")
