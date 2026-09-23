@@ -179,19 +179,11 @@ PMP::pmpUpdateCfg(uint32_t pmp_index, uint8_t this_cfg)
     pmpTable[pmp_index].pmpCfg = this_cfg;
     pmpUpdateRule(pmp_index);
 
-    // Check for encryption
-    if (ifEncrypt(this_cfg)) {
-      // Send to memory encryption engine
-      printf("pmpcfg: %u -> encrypt bit set\n Updating CFG in ePMPTable\n", this_cfg);
+    // Send to memory encryption engine
+    printf("pmpCfg: %u -> encrypt bit set\n", this_cfg);
 
-      // update ePMPTable within memory controller
-      memCtrl->epmpTable[pmp_index].pmpCfg = this_cfg;
-    }
-    else {
-      // Send to external memory controller
-      printf("pmpcfg: %u -> encrypt bit is not set\n NOT UPDATING ePMPTable\n", this_cfg);
-      // printf("\n\nSanity Check - MEE->max_active_requests: %d\n\n", mee->max_active_requests);
-    }
+    // update ePMPTable within memory controller
+    memCtrl->epmpTable[pmp_index].pmpCfg = this_cfg;
 
     return true;
 }
@@ -251,11 +243,8 @@ PMP::pmpUpdateRule(uint32_t pmp_index)
     }
 
     // update ePMP table
-    if (ifEncrypt(pmpTable[pmp_index].pmpCfg)) {
-      // Send to MemCtrl - encrypt bit is set
-      printf("pmpcfg: %u -> encrypt bit set\n Updating ADDRESS in ePMPTable\n", this_cfg);
-      memCtrl->epmpTable[pmp_index].rawAddr = this_addr;
-    }
+    printf("pmpAddr: %u -> encrypt bit set\n", this_cfg);
+    memCtrl->epmpTable[pmp_index].rawAddr = this_addr;
 }
 
 void
