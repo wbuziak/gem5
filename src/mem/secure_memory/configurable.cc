@@ -41,6 +41,7 @@
  */
 
 #include "mem/secure_memory/configurable.hh"
+#include "sim/pseudo_inst.hh"
 
 namespace gem5::memory {
 
@@ -59,8 +60,8 @@ Configurable::Configurable(const ConfigurableParams *p)
      use_metadata_cache(p->cache),
      cache_mac(p->cache_mac),
      eager_fetch(p->eager_fetch),
-     bonsai(p->bonsai),
      secure(p->secure),
+     bonsai(p->bonsai),
      cipherEvent([this] { cipherEngine(); }, name()),
      macEvent([this] { macEngine(); }, name()),
      parallelReadRespondEvent([this] { respondParallelRead(); }, name()),
@@ -105,7 +106,8 @@ Configurable::startup()
 
     // hashing
     //secure = secure | 1;
-    printf("\n\nsecure value: %d\n\n", secure);
+
+    epmpTable.mode = integrity_levels.size(); 
 
     // encryption
     //secure = secure | (1 << 1);
@@ -280,6 +282,8 @@ Configurable::handleRequest(PacketPtr pkt)
     Addr counter_addr = calculateCounterAddress(pkt->getAddr());
     RequestPtr req = std::make_shared<Request>(counter_addr, BLOCK_SIZE, 0, 0);
     PacketPtr counter_pkt = Packet::createRead(req);
+
+    printf("src/mem/secure_memory/configurable.cc: ASID: %x\n", req->getSatpContext());
 
     if (pkt->isWrite()) {
         if (secure & (1 << 1)) {

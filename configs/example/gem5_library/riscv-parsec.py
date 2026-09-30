@@ -328,13 +328,26 @@ board = RiscvBoard(
 
 # micro-benchmark command
 if (args.benchmark == "microbenchmark"):
-    command = (
-        f"cd;"
-        f"cd repos/microbenchmark;"
-        f"./bin/micro 500000000 536870900;" # 500 million accesses on approximately 8GB
-        f"sleep 5;"
-        f"m5 exit;"
-    )
+    #command = (
+    #    f"cd;"
+    #    f"cd repos/microbenchmark;"
+    #    f"./bin/micro 500000000 536870900 > tmp/bg_out.log 2>&1 &;" # background process w/ '&' operator 
+    #    f"BG_PID=$!;"
+    #    f"./bin/micro 500000000 536870900 > tmp/fg_out.log 2>&1;" # 500 million accesses on approximately 8GB
+    #    f"wait $BG_PID;" # wait on background process
+    #    f"sleep 5;"
+    #    f"m5 exit;"
+    #)
+    command = """
+      cd ~/repos/microbenchmark
+      mkdir -p tmp
+      ./bin/micro 500000000 536870900 > tmp/bg_out.log 2>&1 &
+      BG_PID=$!
+      ./bin/micro 500000000 536870900 > tmp/fg_out.log 2>&1
+      wait $BG_PID
+      sleep 5
+      m5 exit
+    """
 else:
 # parsec command
     command = (

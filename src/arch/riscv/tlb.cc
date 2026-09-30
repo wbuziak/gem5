@@ -440,6 +440,11 @@ TLB::translateAtomic(const RequestPtr &req, ThreadContext *tc,
                      BaseMMU::Mode mode)
 {
     bool delayed;
+
+    // Set satp (Persistent ASID) for ePMP mapping
+    uint64_t satp = tc->readMiscReg(MISCREG_SATP);
+    req->setSatpContext(satp);
+
     return translate(req, tc, nullptr, mode, delayed);
 }
 
@@ -449,6 +454,11 @@ TLB::translateTiming(const RequestPtr &req, ThreadContext *tc,
 {
     bool delayed;
     assert(translation);
+
+    // Set satp (Persistent ASID) for ePMP mapping
+    uint64_t satp = tc->readMiscReg(MISCREG_SATP);
+    req->setSatpContext(satp);
+
     Fault fault = translate(req, tc, translation, mode, delayed);
     if (!delayed)
         translation->finish(fault, req, tc, mode);

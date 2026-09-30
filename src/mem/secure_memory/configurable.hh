@@ -64,6 +64,15 @@ struct PmpEntry
   Addr rawAddr;
   /** pmpcfg reg value for a pmp entry */
   uint8_t pmpCfg = 0;
+
+};
+
+struct ePMPTable {
+  // ePMP table for RISC-V
+  std::vector<PmpEntry> pmpEntries;
+
+  /** tree mode is simply the # of levels in the tree **/
+  uint8_t mode = 0;
 };
 
 class Configurable : public SimObject
@@ -406,8 +415,8 @@ class Configurable : public SimObject
     Addr calculateCounterAddress(Addr data_address); // defined in source
     Addr calculateParentAddress(Addr metadata_address); // defined in source
 
-    // ePMP table for RISC-V
-    std::vector<PmpEntry> epmpTable;
+    // RISC-V ePMP Table (security)
+    ePMPTable epmpTable; 
 
     // for stats, defined in source
     struct ConfigurableStats : public statistics::Group
