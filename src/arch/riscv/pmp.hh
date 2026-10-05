@@ -37,7 +37,6 @@
 #include "mem/packet.hh"
 #include "params/PMP.hh"
 #include "sim/sim_object.hh"
-#include "mem/secure_memory/configurable.hh"
 
 /**
  * @file
@@ -46,6 +45,10 @@
 
 namespace gem5
 {
+  namespace memory
+  {
+    class Configurable;
+  }
 
 namespace RiscvISA
 {

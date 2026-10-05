@@ -40,6 +40,7 @@
 #include "mem/request.hh"
 #include "params/PMP.hh"
 #include "sim/sim_object.hh"
+#include "mem/secure_memory/configurable.hh"
 
 namespace gem5
 {
