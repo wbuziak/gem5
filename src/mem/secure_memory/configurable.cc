@@ -291,10 +291,10 @@ Configurable::handleRequest(PacketPtr pkt)
     printf("src/mem/secure_memory/configurable.cc: ASID: %lx\n", req->getSatpContext());
 
     if (pkt->isWrite()) {
-        if (secure & (1 << 1) || ePMPSecurity(req) & (1 << 1)) {
+        if (secure & (1 << 1) || ePMPSecurity(req->getPaddr(), req->getSize()) & (1 << 1)) {
           // Encryption is enabled, fetch counter
           awaiting_counter.emplace(pkt);
-        } else if (secure & 1 || ePMPSecurity(req) & 1) {
+        } else if (secure & 1 || ePMPSecurity(req->getPaddr(), req->getSize()) & 1) {
           // Hashing is enabled, but encryption is not. Route to MAC queue.
           // We don't want to wait on the counter
           initiateMac(pkt);
@@ -322,7 +322,7 @@ Configurable::handleRequest(PacketPtr pkt)
 
             // request the mac as well
             // Only if hashing flag is set
-            if (secure & 1 || ePMPSecurity(req) & 1) {
+            if (secure & 1 || ePMPSecurity(req->getPaddr(), req->getSize()) & 1) {
               Addr mac_addr = calculateMacAddress(pkt->getAddr());
               RequestPtr req = std::make_shared<Request>(
                   mac_addr, BLOCK_SIZE, 0, 0
@@ -356,7 +356,7 @@ Configurable::handleRequest(PacketPtr pkt)
 
     // send counter request to memory
     // Only when we want to do encryption
-    if (secure & (1 << 1) || ePMPSecurity(req) & (1 << 1)) {
+    if (secure & (1 << 1) || ePMPSecurity(req->getPaddr(), req->getSize()) & (1 << 1)) {
       counter_pkt->allocate();
       if (use_metadata_cache) {
           metadata_request_port.sendPacket(counter_pkt);
@@ -374,17 +374,13 @@ Configurable::handleRequest(PacketPtr pkt)
 void
 Configurable::handleMetadataCacheMiss(PacketPtr pkt)
 {
-    Addr parent_addr = calculateParentAddress(pkt->getAddr());
-    RequestPtr req = std::make_shared<Request>(
-        parent_addr, BLOCK_SIZE, 0, 0
-    );
-    PacketPtr parent_pkt = Packet::createRead(req);
+
     assert(pkt->isRead());
     assert(isMetadata(pkt->getAddr()));
     assert(!isMac(pkt->getAddr()) || cache_mac);
-    assert(secure || ePMPSecurity(req) > 0);
+    assert(secure || ePMPSecurity(pkt->getAddr(), pkt->getSize()) > 0);
 
-    if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1] && (secure & 1 || ePMPSecurity(req) & 1)) {
+    if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1] && (secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1)) {
         // this is a tree node, we need to track the miss
         if ((!isMac(pkt->getAddr()) && !isCounter(pkt->getAddr())) ||
             (bonsai && isCounter(pkt->getAddr())) ||
@@ -402,6 +398,11 @@ Configurable::handleMetadataCacheMiss(PacketPtr pkt)
     }
 
     if (eager_fetch && pkt->getAddr() < integrity_levels[1] && (!bonsai || !isMac(pkt->getAddr()))) {
+        Addr parent_addr = calculateParentAddress(pkt->getAddr());
+        RequestPtr req = std::make_shared<Request>(
+           parent_addr, BLOCK_SIZE, 0, 0
+        );
+        PacketPtr parent_pkt = Packet::createRead(req);
         // send to cache
         assert(use_metadata_cache);
         parent_pkt->allocate();
@@ -417,7 +418,7 @@ Configurable::handleResponse(PacketPtr pkt)
     if (pkt->isRead() && !parallelReadAndWrite(pkt)) {
         
         // 1. Wait for Counters ONLY if encryption is enabled
-        if (secure & (1 << 1)) {
+        if (secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
             auto ctr_found = counter_fetched.find(pkt->getAddr());
             if (ctr_found != counter_fetched.end()) {
                 // we are all set to start the decryption procedure
@@ -441,7 +442,7 @@ Configurable::handleResponse(PacketPtr pkt)
         }
 
         // 2. Wait for MACs ONLY if hashing is enabled
-        if (secure & 1) {
+        if (secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize())) {
             auto mac_found = mac_fetched.find(pkt->getAddr());
             if (mac_found != mac_fetched.end()) {
                 // we are all set to start the authentication procedure
@@ -465,7 +466,7 @@ Configurable::handleResponse(PacketPtr pkt)
         }
         
         // 3. If NO security is enabled, send straight to CPU
-        if (secure == 0) {
+        if (secure == 0 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) == 0) {
             cpu_port.sendPacket(pkt);
         }
 
@@ -501,7 +502,7 @@ Configurable::processCounterResponse(PacketPtr pkt)
 bool
 Configurable::handleCounterResponse(PacketPtr pkt)
 {
-    assert(secure & (1 << 1));
+    assert(secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -530,7 +531,7 @@ Configurable::handleCounterResponse(PacketPtr pkt)
                 // not sure who will trigger retry event if this fails
                 assert((*it)->isRequest());
                 // Only call initiateMac if doing hashing
-                if (secure & 1) {
+                if (secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
                     if (!initiateMac(*it)) {
                         pending_mac.push_back(*it);
                     }
@@ -554,7 +555,7 @@ Configurable::handleCounterResponse(PacketPtr pkt)
 bool
 Configurable::handleTreeResponse(PacketPtr pkt)
 {
-    assert(secure & (1 << 2));
+    assert(secure & (1 << 2) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2));
     if (needs_authentication.find(pkt->getAddr()) !=
         needs_authentication.end())
     {
@@ -567,7 +568,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
         {
             if (parent_addr == (*it)->getAddr()) {
                 assert(!authenticated);
-                if (secure & 1) {
+                if (secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
                   // Only go through mac process if hashing
                   // We will just assume authenticated otherwise
                   initiateMac(pkt);
@@ -632,7 +633,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
             if (calculateParentAddress((*it)->getAddr()) == pkt->getAddr()) {
                 // authenticate the child node
                 assert((*it)->isWrite() || (*it)->isResponse());
-                if (secure & 1) {
+                if (secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
                   // Only go through mac process if hashing
                   // We will just authenticate otherwise
                   initiateMac(*it);
@@ -662,11 +663,11 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 
         if (isCounter(pkt->getAddr())) {
             assert(bonsai);
-            assert(secure & (1 << 1));
+            assert(secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
             assert(handleCounterResponse(pkt));
         } else if (isMac(pkt->getAddr())) {
             assert(!bonsai);
-            assert(secure & 1);
+            assert(secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1);
             assert(handleMacResponse(pkt));
         } else {
             if (pkt->isRead() && !child_authenticated) {
@@ -683,7 +684,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 bool
 Configurable::handleMacResponse(PacketPtr pkt)
 {
-    assert(secure & 1);
+    assert(secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1);
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -724,7 +725,7 @@ Configurable::handleMacResponse(PacketPtr pkt)
 bool
 Configurable::initiateCipher(PacketPtr pkt)
 {
-    assert(secure & (1 << 1));
+    assert(secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
     // need to decrypt the data prior to sending to processor
     if (cipher_queue.size() == max_cipher_size) {
         return false;
@@ -769,7 +770,7 @@ Configurable::initiateCipher(PacketPtr pkt)
 bool
 Configurable::initiateMac(PacketPtr pkt)
 {
-    assert(secure & 1);
+    assert(secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1);
     // need to decrypt the data prior to sending to processor
     if (hashing_queue.size() == max_mac_size) {
         return false;
@@ -805,7 +806,7 @@ Configurable::updateTree(PacketPtr pkt)
     mem_port.sendPacket(pkt);
 
     // Update Counter (Only if doing Encryption)
-    if (secure & (1 << 1)) {
+    if (secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
         Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
         RequestPtr ctr_req = std::make_shared<Request>(ctr_addr, BLOCK_SIZE, 0, 0);
         PacketPtr counter_pkt = Packet::createWrite(ctr_req);
@@ -819,7 +820,7 @@ Configurable::updateTree(PacketPtr pkt)
     }
 
     // Update Tree (Only if doing integrity checks)
-    if (secure & (1 << 2)) {
+    if (secure & (1 << 2) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2)) {
         Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
         Addr mac_addr = calculateMacAddress(pkt->getAddr());
         Addr addr = bonsai ? ctr_addr : mac_addr;
@@ -839,7 +840,7 @@ Configurable::updateTree(PacketPtr pkt)
     }
 
     // Update MAC (Only if Hashing is enabled)
-    if (secure & 1) {
+    if (secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
         Addr mac_addr = calculateMacAddress(pkt->getAddr());
         RequestPtr mac_req = std::make_shared<Request>(mac_addr, BLOCK_SIZE, 0, 0);
         PacketPtr mac_pkt = Packet::createWrite(mac_req);
@@ -856,7 +857,6 @@ Configurable::updateTree(PacketPtr pkt)
 void
 Configurable::cipherEngine()
 {
-    assert(secure & (1 << 1));
     assert(!(cipher_queue.empty() && xor_queue.empty()));
 
     PacketPtr pkt;
@@ -865,15 +865,18 @@ Configurable::cipherEngine()
         cipher_queue.front().second < xor_queue.front().second))
     {
         pkt = cipher_queue.front().first;
+        assert(secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
         cipher_queue.pop_front();
     } else {
         assert(!xor_queue.empty());
         pkt = xor_queue.front().first;
+        assert(secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
         xor_queue.pop_front();
     }
 
+
     if (isCounter(pkt->getAddr())) {
-        if (bonsai && secure & (1 << 2)) {
+        if (bonsai && (secure & (1 << 2) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2))) {
             // Only when integrity checking
             handleTreeResponse(pkt); // checks if data is trusted first
         } else {
@@ -882,7 +885,7 @@ Configurable::cipherEngine()
         }
    } else {
         // Are we ALSO doing hashing? If so, we must rendezvous.
-        if (secure & 1) {
+        if (secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
             auto mac_it = std::find(hashed_packets.begin(),
                                     hashed_packets.end(), pkt);
             if (mac_it != hashed_packets.end()) {
@@ -937,17 +940,17 @@ Configurable::cipherEngine()
 void
 Configurable::macEngine()
 {
-    assert(secure & 1);
     assert(!hashing_queue.empty());
 
     PacketPtr pkt = hashing_queue.front().first;
+    assert(secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1);
     hashing_queue.pop_front();
 
     if (isMetadata(pkt->getAddr())) {
         handleTreeResponse(pkt);
     } else {
         // Are we ALSO doing encryption? If so, we must rendezvous.
-        if (secure & (1 << 1)) {
+        if (secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
             auto cipher_it = std::find(ciphered_packets.begin(),
                                        ciphered_packets.end(), pkt);
             if (cipher_it != ciphered_packets.end()) {
@@ -1159,22 +1162,20 @@ Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
         bool is_metadata = parent->isMetadata(pkt->getAddr());
         bool is_mac = parent->isMac(pkt->getAddr());
 
-        if (parent->secure) {
+        if (parent->secure || parent->ePMPSecurity(pkt->getAddr(), pkt->getSize())) {
           // integrity checking or encryption
           if (is_metadata && !is_mac) {
               // this is a tree node
               assert(!is_mac);
               if (parent->use_metadata_cache) {
                   parent->metadata_response_port.sendPacket(pkt);
-              } else if (parent->bonsai && parent->secure & (1 << 2)) {
+              } else if (parent->bonsai && (parent->secure & (1 << 2) || parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2))) {
                   // Only call this if secure flag is set
                   // to do integrity checking
-                  assert(parent->secure & (1 << 2));
                   assert(parent->handleTreeResponse(pkt));
               } else {
                   // this should only be called if we are 
                   // doing encryption
-                  assert(parent->secure & (1 << 1));
                   assert(parent->processCounterResponse(pkt));
               }
           } else {
@@ -1182,7 +1183,7 @@ Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
               assert(is_mac);
               if (parent->cache_mac) {
                   parent->metadata_response_port.sendPacket(pkt);
-              } else if (!parent->bonsai && parent->secure & (1 << 2)) {
+              } else if (!parent->bonsai && (parent->secure & (1 << 2) || parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2))) {
                   // We only want to handle tree responses when
                   // doing integrity checking
                   assert(parent->handleTreeResponse(pkt));
@@ -1241,16 +1242,16 @@ Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
 
     // Otherwise, route read responses based on address and enabled features
     if (parent->isMac(pkt->getAddr())) {
-        if (parent->bonsai && parent->secure & 1) {
+        if (parent->bonsai && (parent->secure & 1 || parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1)) {
             return parent->handleMacResponse(pkt);
         } else {
-            assert(parent->secure & (1 << 2));
+            assert(parent->secure & (1 << 2) || parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2));
             return parent->handleTreeResponse(pkt);
         }
-    } else if (parent->isCounter(pkt->getAddr()) && (parent->secure & (1 << 1))) {
+    } else if (parent->isCounter(pkt->getAddr()) && (parent->secure & (1 << 1) || parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2))) {
         return parent->processCounterResponse(pkt);
     } else {
-        assert(parent->secure & (1 << 2));
+        assert(parent->secure & (1 << 2) || parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2));
         return parent->handleTreeResponse(pkt);
     }
 }
@@ -1356,7 +1357,7 @@ Configurable::pmpDecodeNapot(Addr pmpaddr)
 }
 
 int
-Configurable::ePMPSecurity(const RequestPtr &req)
+Configurable::ePMPSecurity(const Addr &paddr, unsigned int size)
 {
     // match_index will be used to identify the pmp entry
     // which matched for the given address
@@ -1367,8 +1368,8 @@ Configurable::ePMPSecurity(const RequestPtr &req)
     for (int i = 0; i < epmpTable.pmpEntries.size(); i++) {
         AddrRange pmp_range = epmpTable.pmpEntries[i].pmpAddr;
         // Check which address range entry this address falls in
-        if (pmp_range.contains(req->getPaddr()) &&
-               pmp_range.contains(req->getPaddr() + req->getSize() - 1)) {
+        if (pmp_range.contains(paddr) &&
+               pmp_range.contains(paddr + size - 1)) {
             // according to specs address is only matched,
             // when (addr) and (addr + request_size - 1) are both
             // within the pmp range

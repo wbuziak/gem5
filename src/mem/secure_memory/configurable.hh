@@ -462,7 +462,7 @@ class Configurable : public SimObject
      * The function will return either the security type or 
      * pass a fault.
     **/
-    int ePMPSecurity(const RequestPtr &req);
+    int ePMPSecurity(const Addr &paddr, unsigned size);
 
     // Metadata stats for tracking
     uint64_t metadata_cache_accesses;
