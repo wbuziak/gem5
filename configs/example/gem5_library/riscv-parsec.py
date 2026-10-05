@@ -101,7 +101,7 @@ benchmark_choices = [
 # Memory module choices
 
 memory_choices = [
-    "configurable",
+    "configurable", # configurability based on ePMP security
     "hashing_only",
     "encryption_only",
     "hashing+encryption",
@@ -271,8 +271,9 @@ else: # Any kind of configurable memory uses the configurable module
     if (args.memory == "hashing_only"): secure_flag = 1
     elif (args.memory == "encryption_only"): secure_flag = 2
     elif (args.memory == "hashing+encryption"): secure_flag = 3
-    elif ( args.memory == "full_security"): secure_flag = 7
-    elif ( args.memory == "no_security"): secure_flag = 0
+    elif (args.memory == "full_security"): secure_flag = 7
+    elif (args.memory == "no_security"): secure_flag = 0
+    elif (args.memory == "configurability"): secure_flag = -1
     else:
       print(f"Incorrect memory module: {args.memory}")
       exit

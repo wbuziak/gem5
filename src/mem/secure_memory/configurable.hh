@@ -65,6 +65,8 @@ struct PmpEntry
   /** pmpcfg reg value for a pmp entry */
   uint8_t pmpCfg = 0;
 
+  /** Security mode  **/
+  uint8_t security = 7;
 };
 
 struct ePMPTable {
@@ -73,6 +75,7 @@ struct ePMPTable {
 
   /** tree mode is simply the # of levels in the tree **/
   uint8_t mode = 0;
+
 };
 
 class Configurable : public SimObject
@@ -430,93 +433,6 @@ class Configurable : public SimObject
         PMP_NAPOT
     };
 
-    /** pmpcfg address range read permission mask */
-    const uint8_t PMP_READ = 1 << 0;
-
-    /** pmpcfg address range write permission mask */
-    const uint8_t PMP_WRITE = 1 << 1;
-
-    /** pmpcfg address range execute permission mask */
-    const uint8_t PMP_EXEC = 1 << 2;
-
-    /** pmpcfg A field mask */
-    const uint8_t PMP_A_MASK = 3 << 3;
-
-    /** pmpcfg address range locked mask */
-    const uint8_t PMP_LOCK = 1 << 7;
-
-    /** variable to keep track of active number of rules any time */
-    int numRules;
-
-    /** variable to keep track of any lock of entry */
-    bool hasLockEntry;
-
-    /**
-     * pmpCheck checks if a particular memory access
-     * is allowed based on the pmp rules.
-     * @param req memory request.
-     * @param mode mode of request (read, write, execute).
-     * @param pmode current privilege mode of memory (U, S, M).
-     * @param tc thread context.
-     * @param vaddr optional parameter to pass vaddr of original
-     * request for which a page table walk is consulted by pmp unit
-     * @return Fault.
-     */
-    Fault pmpCheck(const RequestPtr &req, uint8_t mode,
-                  uint8_t pmode, ThreadContext *tc,
-                  Addr vaddr = 0);
-
-    /**
-     * pmpUpdateCfg updates the pmpcfg for a pmp
-     * entry and calls pmpUpdateRule to update the
-     * rule of corresponding pmp entry.
-     * @param pmp_index pmp entry index.
-     * @param this_cfg value to be written to pmpcfg.
-     * @returns true if update pmpicfg success
-     */
-    bool pmpUpdateCfg(uint32_t pmp_index, uint8_t this_cfg);
-
-    /**
-     * pmpUpdateAddr updates the pmpaddr for a pmp
-     * entry and calls pmpUpdateRule to update the
-     * rule of corresponding pmp entry.
-     * @param pmp_index pmp entry index.
-     * @param this_addr value to be written to pmpaddr.
-     * @returns true if update pmpaddri success
-     */
-    bool pmpUpdateAddr(uint32_t pmp_index, Addr this_addr);
-
-    
-    /**
-     * This function is called during a memory
-     * access to determine if the pmp table
-     * should be consulted for this access.
-     * @param pmode current privilege mode of memory (U, S, M).
-     * @param tc thread context.
-     * @return true or false.
-     */
-    bool shouldCheckPMP(uint8_t pmode, ThreadContext *tc);
-
-    /**
-     * createAddrfault creates an address fault
-     * if the pmp checks fail to pass for a given
-     * access. This function is used by pmpCheck().
-     * given pmp entry depending on the value
-     * of pmpaddr and pmpcfg for that entry.
-     * @param vaddr virtual address of the access.
-     * @param mode mode of access(read, write, execute).
-     * @return Fault.
-     */
-    Fault createAddrfault(Addr vaddr, uint8_t mode);
-
-    /**
-     * pmpUpdateRule updates the pmp rule for a
-     * given pmp entry depending on the value
-     * of pmpaddr and pmpcfg for that entry.
-     * @param pmp_index pmp entry index.
-     */
-    void pmpUpdateRule(uint32_t pmp_index);
-
     /**
      * pmpGetAField extracts the A field (address matching mode)
      * from an input pmpcfg register
@@ -534,6 +450,19 @@ class Configurable : public SimObject
      * @return an address range.
      */
     inline AddrRange pmpDecodeNapot(Addr pmpaddr);
+
+    /**
+     * This function is a helper function for the
+     * epmpTable. 
+     * The function takes a request address on input
+     * and checks the address range correlating to the 
+     * address to find the corresponding pmp cfg.
+     * The cfg is then passed to decode the A field and 
+     * the address range type. 
+     * The function will return either the security type or 
+     * pass a fault.
+    **/
+    int ePMPSecurity(const RequestPtr &req);
 
     // Metadata stats for tracking
     uint64_t metadata_cache_accesses;
