@@ -272,8 +272,7 @@ else: # Any kind of configurable memory uses the configurable module
     elif (args.memory == "encryption_only"): secure_flag = 2
     elif (args.memory == "hashing+encryption"): secure_flag = 3
     elif (args.memory == "full_security"): secure_flag = 7
-    elif (args.memory == "no_security"): secure_flag = 0
-    elif (args.memory == "configurability"): secure_flag = -1
+    elif (args.memory == "no_security" or args.memory == "configurable"): secure_flag = 0
     else:
       print(f"Incorrect memory module: {args.memory}")
       exit
@@ -329,23 +328,23 @@ board = RiscvBoard(
 
 # micro-benchmark command
 if (args.benchmark == "microbenchmark"):
-    #command = (
-    #    f"cd;"
-    #    f"cd repos/microbenchmark;"
-    #    f"./bin/micro 500000000 536870900;"  
-    #    f"sleep 5;"
-    #    f"m5 exit;"
-    #)
-    command = """
-      cd ~/repos/microbenchmark
-      mkdir -p tmp
-      ./bin/micro 500000000 536870900 > tmp/bg_out.log 2>&1 & 
-      BG_PID=$!
-      ./bin/micro 500000000 536870900 > tmp/fg_out.log 2>&1
-      wait $BG_PID
-      sleep 5
-      m5 exit
-    """ # background process w/ '&' operator
+    command = (
+        f"cd;"
+        f"cd repos/microbenchmark;"
+        f"./bin/micro 500000000 536870900;"  
+        f"sleep 5;"
+        f"m5 exit;"
+    )
+    #command = """
+    #  cd ~/repos/microbenchmark
+    #  mkdir -p tmp
+    #  ./bin/micro 500000000 536870900 > tmp/bg_out.log 2>&1 & 
+    #  BG_PID=$!
+    #  ./bin/micro 500000000 536870900 > tmp/fg_out.log 2>&1
+    #  wait $BG_PID
+    #  sleep 5
+    #  m5 exit
+    #""" # background process w/ '&' operator
 else:
 # parsec command
     command = (

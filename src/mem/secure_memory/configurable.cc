@@ -111,6 +111,14 @@ Configurable::startup()
     // Set tree mode in ePMP
     epmpTable.mode = integrity_levels.size(); 
 
+    // Set security mode manually
+    int i;
+
+    for (i = 0; i < epmpTable.pmpEntries.size(); i++) {
+        epmpTable.pmpEntries[i].security = 7; // set to full security
+    }
+     
+
     // Hit rate for deciding when to change security
     metadata_cache_accesses = 0;
     metadata_cache_misses = 0;
@@ -288,7 +296,7 @@ Configurable::handleRequest(PacketPtr pkt)
     RequestPtr req = std::make_shared<Request>(counter_addr, BLOCK_SIZE, 0, 0);
     PacketPtr counter_pkt = Packet::createRead(req);
 
-    printf("src/mem/secure_memory/configurable.cc: ASID: %lx\n", req->getSatpContext());
+    //printf("src/mem/secure_memory/configurable.cc: ASID: %lx\n", req->getSatpContext());
 
     if (pkt->isWrite()) {
         if (secure & (1 << 1) || ePMPSecurity(req->getPaddr(), req->getSize()) & (1 << 1)) {
@@ -1359,34 +1367,52 @@ Configurable::pmpDecodeNapot(Addr pmpaddr)
 int
 Configurable::ePMPSecurity(const Addr &paddr, unsigned int size)
 {
-    // match_index will be used to identify the pmp entry
-    // which matched for the given address
-    int match_index = -1;
+    // Handle 0-size requests safely to avoid underflow
+    Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
 
-    // all pmp entries need to be looked from the lowest to
-    // the highest number
     for (int i = 0; i < epmpTable.pmpEntries.size(); i++) {
-        AddrRange pmp_range = epmpTable.pmpEntries[i].pmpAddr;
-        // Check which address range entry this address falls in
-        if (pmp_range.contains(paddr) &&
-               pmp_range.contains(paddr + size - 1)) {
-            // according to specs address is only matched,
-            // when (addr) and (addr + request_size - 1) are both
-            // within the pmp range
-            match_index = i;
+        uint8_t cfg = epmpTable.pmpEntries[i].pmpCfg;
+        uint8_t a_field = pmpGetAField(cfg);
+
+        // Skip entries with address matching disabled
+        if (a_field == PMP_OFF) {
+            continue;
         }
 
-        // Pass the cfg to get range type
-        if ((match_index > -1)
-            && (PMP_OFF != pmpGetAField(epmpTable.pmpEntries[match_index].pmpCfg))) {
+        //  Decode the range based on the address mode (A-field)
+        AddrRange pmp_range(0, 0);
+        Addr raw_addr = epmpTable.pmpEntries[i].rawAddr; // Raw unshifted PMP register value
 
-            // We have the specific entry / address range
-            // Now, we return this entries security mode
-            return epmpTable.pmpEntries[match_index].security;
+        if (a_field == PMP_TOR) {
+            // Top of Range: lower bound is entry (i - 1), upper bound is entry i
+            Addr lower = 0;
+            if (i > 0) {
+                lower = epmpTable.pmpEntries[i - 1].rawAddr << 2;
+            }
+            Addr upper = raw_addr << 2;
+            pmp_range = AddrRange(lower, upper);
+
+        } else if (a_field == PMP_NA4) {
+            // Naturally Aligned 4-Byte
+            Addr base = raw_addr << 2;
+            pmp_range = AddrRange(base, base + 4);
+
+        } else if (a_field == PMP_NAPOT) {
+            // Pretty sure everything in gem5 is 
+            // Naturally Aligned Power-of-Two
+            pmp_range = pmpDecodeNapot(raw_addr);
+        }
+
+        // Match against the dynamically computed range
+        if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
+            printf("ePMP Entry #%d matched dynamically [%lx - %lx]. Security flag: %d\n", i, pmp_range.start(), pmp_range.end(), epmpTable.pmpEntries[i].security);
+
+            return epmpTable.pmpEntries[i].security;
         }
     }
 
-    return -1; // Req address not found
+    // Return -1 if no active entry matches
+    return 0;
 }
 
 // stats function definition
