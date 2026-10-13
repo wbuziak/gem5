@@ -108,6 +108,10 @@ Configurable::startup()
 
     integrity_levels.shrink_to_fit(); // C++ data structures... meh :/
 
+    // The following is technically incorrect, since ideally the only
+    // system with control over the ePMP is still the security monitor
+    // so be it, right?
+
     // Set tree mode in ePMP
     epmpTable.mode = integrity_levels.size(); 
 
@@ -118,6 +122,22 @@ Configurable::startup()
         epmpTable.pmpEntries[i].security = 7; // set to full security
     }
      
+    // Include metadata in the ePMP table with an artificial entry 
+    // Create a lower bound entry (if needed for TOR, or use existing)
+    PmpEntry lower_bound;
+    lower_bound.rawAddr = end >> 2; // Shifted for PMP format
+    lower_bound.pmpCfg = 0; // PMP_OFF, just acts as a base
+    lower_bound.security = 7; // since PMP_OFF this doesn't matter
+    epmpTable.pmpEntries.push_back(lower_bound);
+
+    // Create the metadata bounds entry
+    PmpEntry metadata_entry;
+    metadata_entry.rawAddr = level_start >> 2; // level_start is the top of your metadata
+    // Set A-field to PMP_TOR (value 1). Shift to bits 3-4.
+    metadata_entry.pmpCfg = (1 << 3);
+    metadata_entry.security = 7; // Set to whatever your required metadata security mode is
+
+    epmpTable.pmpEntries.push_back(metadata_entry);
 
     // Hit rate for deciding when to change security
     metadata_cache_accesses = 0;
@@ -1405,14 +1425,15 @@ Configurable::ePMPSecurity(const Addr &paddr, unsigned int size)
 
         // Match against the dynamically computed range
         if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
-            printf("ePMP Entry #%d matched dynamically [%lx - %lx]. Security flag: %d\n", i, pmp_range.start(), pmp_range.end(), epmpTable.pmpEntries[i].security);
+            printf("ePMP Entry #%d matched, Address Range: [%lx - %lx]. Security flag: %d\n", i, pmp_range.start(), pmp_range.end(), epmpTable.pmpEntries[i].security);
 
             return epmpTable.pmpEntries[i].security;
         }
     }
 
-    // Return -1 if no active entry matches
-    return 0;
+    // This should likely cause an error, no packets
+    // should fall outside the PMP table
+    return -1;
 }
 
 // stats function definition
