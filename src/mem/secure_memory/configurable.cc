@@ -444,9 +444,10 @@ Configurable::handleResponse(PacketPtr pkt)
     assert(pkt->isResponse());
 
     if (pkt->isRead() && !parallelReadAndWrite(pkt)) {
-        
-        // 1. Wait for Counters ONLY if encryption is enabled
-        if (secure & (1 << 1) || ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
+        // Unified security check
+        int sec_flag = secure | ePMPSecurity(pkt->getAddr(), pkt->getSize());
+        // Wait for Counters ONLY if encryption is enabled
+        if (sec_flag & (1 << 1)) {
             auto ctr_found = counter_fetched.find(pkt->getAddr());
             if (ctr_found != counter_fetched.end()) {
                 // we are all set to start the decryption procedure
@@ -469,8 +470,8 @@ Configurable::handleResponse(PacketPtr pkt)
             }
         }
 
-        // 2. Wait for MACs ONLY if hashing is enabled
-        if (secure & 1 || ePMPSecurity(pkt->getAddr(), pkt->getSize())) {
+        //  Wait for MACs ONLY if hashing is enabled
+        else if (sec_flag & 1) {
             auto mac_found = mac_fetched.find(pkt->getAddr());
             if (mac_found != mac_fetched.end()) {
                 // we are all set to start the authentication procedure
@@ -493,8 +494,8 @@ Configurable::handleResponse(PacketPtr pkt)
             }
         }
         
-        // 3. If NO security is enabled, send straight to CPU
-        if (secure == 0 || ePMPSecurity(pkt->getAddr(), pkt->getSize()) == 0) {
+        // If NO security is enabled, send straight to CPU
+        else if (sec_flag == 0) {
             cpu_port.sendPacket(pkt);
         }
 
@@ -1016,39 +1017,9 @@ Configurable::macEngine()
 }
 
 bool
-Configurable::parallelReadAndWrite(PacketPtr pkt)
+Configurable::parallelReadAndWrite(PacketPtr pkt) 
 {
     bool found = false;
-
-    // check if we are currently trying to write this data to memory
-    // if so, get state from pending packet as it is more up-to-date
-    // (traverse back to front to get most recent version if multiple
-    // pending writes)
-    // our counter is now useless to us... we found plain-text data
-    for (auto it = cipher_queue.rbegin();
-         it != cipher_queue.rend();
-         ++it)
-    {
-        if (it->first->getAddr() == pkt->getAddr() &&
-            it->first->getSize() == pkt->getSize())
-        {
-            // set data to packet from pending write
-            uint8_t data[pkt->getSize()]; // 64B (word size)
-            it->first->writeData(data);
-            pkt->setData(data);
-
-            if (pkt->needsResponse()) {
-                pkt->makeResponse();
-                found_reads.push_back(pkt);
-
-                // respond to processor in same clock cycle
-                if (!parallelReadRespondEvent.scheduled()) {
-                    schedule(parallelReadRespondEvent, curTick());
-                }
-            }
-            found = true;
-        }
-    }
 
     for (auto it = awaiting_counter.rbegin();
          it != awaiting_counter.rend();
@@ -1057,41 +1028,65 @@ Configurable::parallelReadAndWrite(PacketPtr pkt)
         if ((*it)->getAddr() == pkt->getAddr() &&
             (*it)->getSize() == pkt->getSize())
         {
-            // set data to packet from pending write
-            uint8_t data[pkt->getSize()]; // 64B (word size)
+            uint8_t data[pkt->getSize()]; 
             (*it)->writeData(data);
             pkt->setData(data);
 
             if (pkt->needsResponse()) {
                 pkt->makeResponse();
+            }
+            found_reads.push_back(pkt);
+
+            if (!parallelReadRespondEvent.scheduled()) {
+               schedule(parallelReadRespondEvent, curTick());
+            }
+            found = true;
+            break; 
+        }
+    }
+
+    if (!found) {
+        for (auto it = cipher_queue.rbegin();
+             it != cipher_queue.rend();
+             ++it)
+        {
+            if (it->first->getAddr() == pkt->getAddr() &&
+                it->first->getSize() == pkt->getSize())
+            {
+                uint8_t data[pkt->getSize()]; 
+                it->first->writeData(data);
+                pkt->setData(data);
+
+                if (pkt->needsResponse()) {
+                    pkt->makeResponse();
+                }
+
                 found_reads.push_back(pkt);
 
-                // respond to processor in same clock cycle
                 if (!parallelReadRespondEvent.scheduled()) {
-                    schedule(parallelReadRespondEvent, curTick());
+                   schedule(parallelReadRespondEvent, curTick());
                 }
-            }
 
-            found = true;
+                found = true;
+                break; 
+            }
         }
     }
 
     if (found) {
-      if (pending_reads.find(pkt->getAddr()) != pending_reads.end()) {
-          pending_reads[pkt->getAddr()]--;
+        if (pending_reads.find(pkt->getAddr()) != pending_reads.end()) {
+            pending_reads[pkt->getAddr()]--;
 
-          if (pending_reads[pkt->getAddr()] == 0) {
-            pending_reads.erase(pkt->getAddr());
-          }
-      } else if (counter_fetched.find(pkt->getAddr()) !=
-          counter_fetched.end())
-      {
-          counter_fetched[pkt->getAddr()]--;
+            if (pending_reads[pkt->getAddr()] == 0) {
+                pending_reads.erase(pkt->getAddr());
+            }
+        } else if (counter_fetched.find(pkt->getAddr()) != counter_fetched.end()) {
+            counter_fetched[pkt->getAddr()]--;
 
-          if (counter_fetched[pkt->getAddr()] == 0) {
-              counter_fetched.erase(pkt->getAddr());
-          }
-      }
+            if (counter_fetched[pkt->getAddr()] == 0) {
+                counter_fetched.erase(pkt->getAddr());
+            }
+        }
     }
 
     return found;
