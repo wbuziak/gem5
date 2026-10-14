@@ -271,8 +271,8 @@ else: # Any kind of configurable memory uses the configurable module
     if (args.memory == "hashing_only"): secure_flag = 1
     elif (args.memory == "encryption_only"): secure_flag = 2
     elif (args.memory == "hashing+encryption"): secure_flag = 3
-    elif (args.memory == "full_security"): secure_flag = 7
-    elif (args.memory == "no_security" or args.memory == "configurable"): secure_flag = 0
+    elif (args.memory == "full_security" or args.memory == "configurable"): secure_flag = 7
+    elif (args.memory == "no_security"): secure_flag = 0
     else:
       print(f"Incorrect memory module: {args.memory}")
       exit
