@@ -272,20 +272,31 @@ def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int
     # 3. BODYTRACK (App)
     elif benchmark == "bodytrack":
         bin_path = f"{parsec_root}/pkgs/apps/bodytrack/inst/riscv64-linux.gcc-hooks/bin/bodytrack"
+        inputs_dir = f"{parsec_root}/pkgs/apps/bodytrack/inputs"
+
         input_map = {
-            "test": ("4", "1", "100", "5", "0"),
-            "simsmall": ("4", "1", "1000", "5", "0"),
-            "simmedium": ("4", "2", "2000", "5", "0"),
-            "simlarge": ("4", "4", "4000", "5", "0"),
+            "test": ("input_test.tar", "4", "1", "100", "5", "0"),
+            "simsmall": ("input_simsmall.tar", "4", "1", "1000", "5", "0"),
+            "simmedium": ("input_simmedium.tar", "4", "2", "2000", "5", "0"),
+            "simlarge": ("input_simlarge.tar", "4", "4", "4000", "5", "0"),
         }
-        cams, frames, particles, layers, mode = input_map.get(
-            size, ("4", "1", "1000", "5", "0")
+        tar_name, cams, frames, particles, layers, mode = input_map.get(
+            size, ("input_simsmall.tar", "4", "1", "1000", "5", "0")
         )
-        seq_dir = f"{parsec_root}/pkgs/apps/bodytrack/inputs/sequence"
 
         cmds.extend([
             "mkdir -p /tmp/bt_run",
-            f"{bin_path} {seq_dir} {cams} {frames} {particles} {layers} {threads} {mode}",
+            f"mkdir -p {inputs_dir}",
+            f"cd {inputs_dir}",
+            # 1. Untar if CALIB directory is not extracted yet
+            f'if [ ! -d "{inputs_dir}/CALIB" ] && [ ! -d "{inputs_dir}/sequence/CALIB" ] && [ -f "{inputs_dir}/{tar_name}" ]; then '
+            f'tar -xf "{inputs_dir}/{tar_name}"; fi',
+            # 2. Dynamically locate the sequence directory containing CALIB/
+            f'CALIB_FILE=$(find {inputs_dir} -name "Camera1.cal" 2>/dev/null | head -n 1)',
+            'SEQ_DIR=$(dirname $(dirname "$CALIB_FILE"))',
+            # 3. Fallback if sequence path resolution fails
+            f'if [ -z "$SEQ_DIR" ]; then SEQ_DIR="{inputs_dir}"; fi',
+            f"{bin_path} $SEQ_DIR {cams} {frames} {particles} {layers} {threads} {mode}",
         ])
 
     # 4. STREAMCLUSTER (Kernel)
