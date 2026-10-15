@@ -233,58 +233,70 @@ def get_parsec_workload_cmd(
 ) -> str:
     """Generates robust POSIX guest OS shell scripts for PARSEC 3.0 benchmarks
 
-    on RISC-V gem5 full-system simulations, with dynamic input resolution.
+    on RISC-V gem5 full-system simulations with explicit dynamic linking.
     """
     parsec_root = "/home/gem5/parsec-benchmark"
     hooks_lib = (
         f"{parsec_root}/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib"
     )
 
-    lib_paths = f"{hooks_lib}:/lib:/usr/lib:/usr/local/lib"
+    # Added /usr/lib/riscv64-linux-gnu to resolve libstdc++.so.6
+    lib_paths = f"{hooks_lib}:/usr/lib/riscv64-linux-gnu:/lib:/usr/lib"
 
     cmds = [
         "#!/bin/sh",
         f"export LD_LIBRARY_PATH={lib_paths}:$LD_LIBRARY_PATH",
-        "echo '=== STARTING PARSEC WORKLOAD EXECUTION ==='",
+        "echo '=== LD_LIBRARY_PATH ==='",
+        "echo $LD_LIBRARY_PATH",
     ]
 
-    # 1. DEDUP (Kernel: pkgs/kernels/dedup)
+    # Helper wrapper to print dynamic dependencies and capture standard error
+    def wrap_run(bin_path: str, run_cmd: str) -> list[str]:
+        return [
+            f"echo '=== LDD CHECK FOR {bin_path} ==='",
+            f"ldd {bin_path} 2>/dev/null || true",
+            f"echo '=== EXECUTING: {run_cmd} ==='",
+            f"{run_cmd} 2>/tmp/err.log || {{ echo 'EXECUTION FAILED:'; cat /tmp/err.log; m5 exit; }}",
+        ]
+
+    # 1. DEDUP (Kernel)
     if benchmark == "dedup":
         bin_path = f"{parsec_root}/pkgs/kernels/dedup/inst/riscv64-linux.gcc-hooks/bin/dedup"
+        run_cmd = f"{bin_path} -c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp"
         cmds.extend([
             "mkdir -p /tmp/dedup_run",
             "dd if=/dev/urandom of=/tmp/dedup_run/media.dat bs=1M count=10 2>/dev/null",
-            f"{bin_path} -c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp",
         ])
+        cmds.extend(wrap_run(bin_path, run_cmd))
 
-    # 2. CANNEAL (Kernel: pkgs/kernels/canneal)
+    # 2. CANNEAL (Kernel)
     elif benchmark == "canneal":
         bin_path = f"{parsec_root}/pkgs/kernels/canneal/inst/riscv64-linux.gcc-hooks/bin/canneal"
         inputs_dir = f"{parsec_root}/pkgs/kernels/canneal/inputs"
         input_map = {
-            "test": ("2500.nets", "100", "300", "2"),
+            "test": ("100.nets", "100", "300", "2"),
             "simsmall": ("100000.nets", "100", "300", "2"),
             "simmedium": ("200000.nets", "15000", "2000", "32"),
             "simlarge": ("400000.nets", "15000", "2000", "32"),
         }
-        netlist_name, swaps, temp, steps = input_map.get(
+        target_netlist, swaps, temp, steps = input_map.get(
             size, ("100000.nets", "100", "300", "2")
         )
 
         cmds.extend([
             "mkdir -p /tmp/canneal_run",
-            f'NETLIST="{inputs_dir}/{netlist_name}"',
+            f'NETLIST="{inputs_dir}/{target_netlist}"',
             f'if [ ! -f "$NETLIST" ]; then NETLIST=$(ls {inputs_dir}/*.nets 2>/dev/null | tail -n 1); fi',
             'if [ -z "$NETLIST" ] || [ ! -f "$NETLIST" ]; then '
             'NETLIST="/tmp/canneal_run/test.nets"; '
             'echo "100 50" > "$NETLIST"; '
             "i=0; while [ $i -lt 50 ]; do echo \"1 $i $((i+1))\" >> \"$NETLIST\"; i=$((i+1)); done; "
             "fi",
-            'echo "Running CANNEAL with netlist: $NETLIST"',
-            f'{bin_path} {threads} {swaps} {temp} "$NETLIST" {steps}',
         ])
+        run_cmd = f'{bin_path} {threads} {swaps} {temp} "$NETLIST" {steps}'
+        cmds.extend(wrap_run(bin_path, run_cmd))
 
-    # 3. BODYTRACK (App: pkgs/apps/bodytrack)
+    # 3. BODYTRACK (App)
     elif benchmark == "bodytrack":
         bin_path = f"{parsec_root}/pkgs/apps/bodytrack/inst/riscv64-linux.gcc-hooks/bin/bodytrack"
         inputs_dir = f"{parsec_root}/pkgs/apps/bodytrack/inputs"
@@ -304,11 +316,11 @@ def get_parsec_workload_cmd(
             f'for d in "{inputs_dir}"/* "{inputs_dir}"; do '
             'if [ -d "$d/CALIB" ]; then SEQ_DIR="$d"; break; fi; done',
             'if [ -z "$SEQ_DIR" ]; then echo "ERROR: Bodytrack CALIB directory missing"; m5 exit; fi',
-            'echo "Running BODYTRACK with seq dir: $SEQ_DIR"',
-            f'{bin_path} "$SEQ_DIR" {cams} {frames} {particles} {layers} {threads} {mode}',
         ])
+        run_cmd = f'{bin_path} "$SEQ_DIR" {cams} {frames} {particles} {layers} {threads} {mode}'
+        cmds.extend(wrap_run(bin_path, run_cmd))
 
-    # 4. STREAMCLUSTER (Kernel: pkgs/kernels/streamcluster)
+    # 4. STREAMCLUSTER (Kernel)
     elif benchmark == "streamcluster":
         bin_path = f"{parsec_root}/pkgs/kernels/streamcluster/inst/riscv64-linux.gcc-hooks/bin/streamcluster"
         input_map = {
@@ -321,18 +333,16 @@ def get_parsec_workload_cmd(
             size, ("10", "20", "32", "4096", "4096", "1000")
         )
 
-        cmds.extend([
-            "mkdir -p /tmp/sc_run",
-            'echo "Running STREAMCLUSTER"',
-            f"{bin_path} {k1} {k2} {dim} {npoints} {chunk} {clusters} none /tmp/sc_run/output.txt {threads}",
-        ])
+        cmds.append("mkdir -p /tmp/sc_run")
+        run_cmd = f"{bin_path} {k1} {k2} {dim} {npoints} {chunk} {clusters} none /tmp/sc_run/output.txt {threads}"
+        cmds.extend(wrap_run(bin_path, run_cmd))
 
-    # 5. FLUIDANIMATE (App: pkgs/apps/fluidanimate)
+    # 5. FLUIDANIMATE (App)
     elif benchmark == "fluidanimate":
         bin_path = f"{parsec_root}/pkgs/apps/fluidanimate/inst/riscv64-linux.gcc-hooks/bin/fluidanimate"
         inputs_dir = f"{parsec_root}/pkgs/apps/fluidanimate/inputs"
         input_map = {
-            "test": ("in_5K.fluid", "5"),
+            "test": ("in_15K.fluid", "5"),
             "simsmall": ("in_35K.fluid", "5"),
             "simmedium": ("in_100K.fluid", "15"),
             "simlarge": ("in_300K.fluid", "500"),
@@ -344,16 +354,16 @@ def get_parsec_workload_cmd(
             f'FLUID_INPUT="{inputs_dir}/{target_fluid}"',
             f'if [ ! -f "$FLUID_INPUT" ]; then FLUID_INPUT=$(ls {inputs_dir}/*.fluid 2>/dev/null | tail -n 1); fi',
             'if [ -z "$FLUID_INPUT" ] || [ ! -f "$FLUID_INPUT" ]; then echo "ERROR: No .fluid input file found"; m5 exit; fi',
-            'echo "Running FLUIDANIMATE with file: $FLUID_INPUT"',
-            f'{bin_path} {threads} {frames} "$FLUID_INPUT" /tmp/fluid_run/fluid.out',
         ])
+        run_cmd = f'{bin_path} {threads} {frames} "$FLUID_INPUT" /tmp/fluid_run/fluid.out'
+        cmds.extend(wrap_run(bin_path, run_cmd))
 
-    # 6. BLACKSCHOLES (App: pkgs/apps/blackscholes)
+    # 6. BLACKSCHOLES (App)
     elif benchmark == "blackscholes":
         bin_path = f"{parsec_root}/pkgs/apps/blackscholes/inst/riscv64-linux.gcc-hooks/bin/blackscholes"
         inputs_dir = f"{parsec_root}/pkgs/apps/blackscholes/inputs"
         input_map = {
-            "test": "in_4.txt",
+            "test": "in_16.txt",
             "simsmall": "in_4K.txt",
             "simmedium": "in_16K.txt",
             "simlarge": "in_64K.txt",
@@ -369,14 +379,14 @@ def get_parsec_workload_cmd(
             'echo "100" > "$INPUT_PATH"; '
             "i=0; while [ $i -lt 100 ]; do echo \"100.0 100.0 0.05 0.10 0.20 1.0 P 0.0 0.0\" >> \"$INPUT_PATH\"; i=$((i+1)); done; "
             "fi",
-            'echo "Running BLACKSCHOLES with file: $INPUT_PATH"',
-            f'{bin_path} {threads} "$INPUT_PATH" /tmp/bs_run/prices.txt',
         ])
+        run_cmd = f'{bin_path} {threads} "$INPUT_PATH" /tmp/bs_run/prices.txt'
+        cmds.extend(wrap_run(bin_path, run_cmd))
 
     else:
         raise ValueError(f"Unsupported benchmark '{benchmark}'")
 
-    cmds.append("echo '=== BENCHMARK FINISHED OR EXITED ==='")
+    cmds.append("echo '=== BENCHMARK COMPLETED SUCCESSFULLY ==='")
     cmds.append("m5 exit")
     return "\n".join(cmds)
 
