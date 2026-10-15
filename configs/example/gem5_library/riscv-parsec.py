@@ -328,24 +328,28 @@ def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int
     # 6. BLACKSCHOLES (App)
     elif benchmark == "blackscholes":
         bin_path = f"{parsec_root}/pkgs/apps/blackscholes/inst/riscv64-linux.gcc-hooks/bin/blackscholes"
+        inputs_dir = f"{parsec_root}/pkgs/apps/blackscholes/inputs"
+
         input_map = {
-            "test": "in_4.txt",
-            "simsmall": "in_4K.txt",
-            "simmedium": "in_16K.txt",
-            "simlarge": "in_64K.txt",
+            "test": ("input_test.tar", "in_4.txt"),
+            "simsmall": ("input_simsmall.tar", "in_4K.txt"),
+            "simmedium": ("input_simmedium.tar", "in_16K.txt"),
+            "simlarge": ("input_simlarge.tar", "in_64K.txt"),
         }
-        input_file_name = input_map.get(size, "in_4K.txt")
-        official_input = f"{parsec_root}/pkgs/apps/blackscholes/inputs/{input_file_name}"
+        tar_name, txt_name = input_map.get(
+            size, ("input_simsmall.tar", "in_4K.txt")
+        )
 
         cmds.extend([
             "mkdir -p /tmp/bs_run",
-            f'if [ -f "{official_input}" ]; then INPUT_PATH="{official_input}"; else '
+            f"mkdir -p {inputs_dir}",
+            f'if [ -f "{inputs_dir}/{tar_name}" ]; then tar -xf "{inputs_dir}/{tar_name}" -C "{inputs_dir}"; fi',
+            f'if [ -f "{inputs_dir}/{txt_name}" ]; then INPUT_PATH="{inputs_dir}/{txt_name}"; else '
             f'echo "1000" > /tmp/bs_run/in_1K.txt && '
-            f'awk \'BEGIN {{ for(i=0;i<1000;i++) print "100.0 100.0 0.05 0.20 1.0 0 0.0" }}\' >> /tmp/bs_run/in_1K.txt && '
+            f'awk \'BEGIN {{ for(i=0;i<1000;i++) print "100.0 100.0 0.05 0.10 0.20 1.0 P 0.0 0.0" }}\' >> /tmp/bs_run/in_1K.txt && '
             f'INPUT_PATH="/tmp/bs_run/in_1K.txt"; fi',
             f"{bin_path} {threads} $INPUT_PATH /tmp/bs_run/prices.txt",
         ])
-
     else:
         raise ValueError(
             f"Unsupported benchmark '{benchmark}'. Choose from: dedup, canneal, bodytrack, streamcluster, fluidanimate, blackscholes."
