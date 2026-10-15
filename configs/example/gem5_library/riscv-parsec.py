@@ -350,6 +350,7 @@ else:
     command = (
         f"cd /home/gem5/parsec-benchmark;"
         + ". ./env.sh;"  # Replaced "source env.sh;" with ". ./env.sh;"
+        + "export LD_LIBRARY_PATH=/home/gem5/parsec-benchmark/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib:$LD_LIBRARY_PATH;"
         + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size} -n 4;"
         + "sleep 5;"
         + "m5 exit;"
@@ -374,8 +375,8 @@ board.set_kernel_disk_workload(
 def handle_workbegin():
     print("Done booting Linux")
     print("Resetting stats at the start of ROI!")
-    m5.stats.reset()
     processor.switch()
+    m5.stats.reset()
     simulator.schedule_max_insts(125000000) # 500 million instructions
     yield False
 
