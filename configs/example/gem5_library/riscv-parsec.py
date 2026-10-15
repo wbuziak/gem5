@@ -246,27 +246,27 @@ def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int
             f"-c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp",
         ])
 
-    # 2. CANNEAL (App)
+    # 2. CANNEAL (Kernel: pkgs/kernels/canneal)
     elif benchmark == "canneal":
+        bin_path = f"{parsec_root}/pkgs/kernels/canneal/inst/riscv64-linux.gcc-hooks/bin/canneal"
+        inputs_dir = f"{parsec_root}/pkgs/kernels/canneal/inputs"
         input_map = {
-            "test": ("2500.nets", "100", "300", "2"),
-            "simsmall": ("100000.nets", "100", "300", "2"),
-            "simmedium": ("200000.nets", "15000", "2000", "32"),
-            "simlarge": ("400000.nets", "15000", "2000", "32"),
+            "test": ("input_test.tar", "2500.nets", "100", "300", "2"),
+            "simsmall": ("input_simsmall.tar", "100000.nets", "100", "300", "2"),
+            "simmedium": ("input_simmedium.tar", "200000.nets", "15000", "2000", "32"),
+            "simlarge": ("input_simlarge.tar", "400000.nets", "15000", "2000", "32"),
         }
-        netlist_name, swaps, temp, steps = input_map.get(
-            size, ("100000.nets", "100", "300", "2")
+        tar_name, netlist_name, swaps, temp, steps = input_map.get(
+            size, ("input_simsmall.tar", "100000.nets", "100", "300", "2")
         )
-        official_input = f"{parsec_root}/pkgs/apps/canneal/inputs/{netlist_name}"
 
         cmds.extend([
             "mkdir -p /tmp/canneal_run",
-            f'if [ -f "{official_input}" ]; then NETLIST_PATH="{official_input}"; else '
-            f'echo "100 50" > /tmp/canneal_run/test.nets && '
-            f'awk \'BEGIN {{ for(i=0;i<50;i++) print "1 " i " " (i+1) }}\' >> /tmp/canneal_run/test.nets && '
-            f'NETLIST_PATH="/tmp/canneal_run/test.nets"; fi',
-            f"{parsec_root}/pkgs/apps/canneal/inst/riscv64-linux.gcc-hooks/bin/canneal "
-            f"{threads} {swaps} {temp} $NETLIST_PATH {steps}",
+            f"mkdir -p {inputs_dir}",
+            f"cd {inputs_dir}",
+            f'if [ ! -f "{netlist_name}" ] && [ -f "{tar_name}" ]; then tar -xf "{tar_name}"; fi',
+            f'NETLIST_PATH=$(ls {inputs_dir}/*.nets 2>/dev/null | head -n 1)',
+            f"{bin_path} {threads} {swaps} {temp} $NETLIST_PATH {steps}",
         ])
 
     # 3. BODYTRACK (App)
