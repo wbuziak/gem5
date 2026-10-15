@@ -116,8 +116,25 @@ Configurable::startup()
 
     for (i = 0; i < epmpTable.pmpEntries.size(); i++) {
         epmpTable.pmpEntries[i].security = secure; // set to full security
+        printf("src/mem/secure_memory/configurable.cc:119 ePMP ENTRY %d SECURE FLAG SET: %d\n", i, secure);
     }
-     
+
+    // Include metadata in the ePMP table with an artificial entry
+    // Create a lower bound entry (if needed for TOR, or use existing)
+    PmpEntry lower_bound;
+    lower_bound.rawAddr = end >> 2; // Shifted for PMP format
+    lower_bound.pmpCfg = 0; // PMP_OFF, just acts as a base
+    lower_bound.security = 7; // since PMP_OFF this doesn't matter
+    epmpTable.pmpEntries.push_back(lower_bound);
+
+    // Create the metadata bounds entry
+    PmpEntry metadata_entry;
+    metadata_entry.rawAddr = level_start >> 2; // level_start is the top of your metadata
+    // Set A-field to PMP_TOR (value 1). Shift to bits 3-4.
+    metadata_entry.pmpCfg = (1 << 3);
+    metadata_entry.security = 7; // Set to whatever your required metadata security mode is
+
+    epmpTable.pmpEntries.push_back(metadata_entry);
 
     // Hit rate for deciding when to change security
     metadata_cache_accesses = 0;
@@ -1405,8 +1422,7 @@ Configurable::ePMPSecurity(const Addr &paddr, unsigned int size)
 
         // Match against the dynamically computed range
         if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
-            printf("ePMP Entry #%d matched dynamically [%lx - %lx]. Security flag: %d\n", i, pmp_range.start(), pmp_range.end(), epmpTable.pmpEntries[i].security);
-
+        //    printf("ePMP Entry #%d matched dynamically [%lx - %lx]. Security flag: %d\n", i, pmp_range.start(), pmp_range.end(), epmpTable.pmpEntries[i].security);
             return epmpTable.pmpEntries[i].security;
         }
     }
