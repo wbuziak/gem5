@@ -229,33 +229,127 @@ args = parser.parse_args()
 
 # helper for parsec command
 def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int = 4) -> str:
+    """Generates multiline guest OS shell scripts for PARSEC 3.0 benchmarks."""
     parsec_root = "/home/gem5/parsec-benchmark"
-    hooks_lib = f"{parsec_root}/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib"
+    hooks_lib = (
+        f"{parsec_root}/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib"
+    )
 
     cmds = [f"export LD_LIBRARY_PATH={hooks_lib}:$LD_LIBRARY_PATH"]
 
+    # 1. DEDUP (Kernel)
     if benchmark == "dedup":
         cmds.extend([
             "mkdir -p /tmp/dedup_run",
             "dd if=/dev/urandom of=/tmp/dedup_run/media.dat bs=1M count=10",
-            f"{parsec_root}/pkgs/kernels/dedup/inst/riscv64-linux.gcc-hooks/bin/dedup -c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp",
+            f"{parsec_root}/pkgs/kernels/dedup/inst/riscv64-linux.gcc-hooks/bin/dedup "
+            f"-c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp",
         ])
+
+    # 2. CANNEAL (App)
     elif benchmark == "canneal":
-        netlist = f"{parsec_root}/pkgs/apps/canneal/inputs/100000.nets"
-        cmds.append(f"{parsec_root}/pkgs/apps/canneal/inst/riscv64-linux.gcc-hooks/bin/canneal {threads} 10000 2000 {netlist} 32")
+        input_map = {
+            "test": ("2500.nets", "100", "300", "2"),
+            "simsmall": ("100000.nets", "100", "300", "2"),
+            "simmedium": ("200000.nets", "15000", "2000", "32"),
+            "simlarge": ("400000.nets", "15000", "2000", "32"),
+        }
+        netlist_name, swaps, temp, steps = input_map.get(
+            size, ("100000.nets", "100", "300", "2")
+        )
+        official_input = f"{parsec_root}/pkgs/apps/canneal/inputs/{netlist_name}"
+
+        cmds.extend([
+            "mkdir -p /tmp/canneal_run",
+            f'if [ -f "{official_input}" ]; then NETLIST_PATH="{official_input}"; else '
+            f'echo "100 50" > /tmp/canneal_run/test.nets && '
+            f'awk \'BEGIN {{ for(i=0;i<50;i++) print "1 " i " " (i+1) }}\' >> /tmp/canneal_run/test.nets && '
+            f'NETLIST_PATH="/tmp/canneal_run/test.nets"; fi',
+            f"{parsec_root}/pkgs/apps/canneal/inst/riscv64-linux.gcc-hooks/bin/canneal "
+            f"{threads} {swaps} {temp} $NETLIST_PATH {steps}",
+        ])
+
+    # 3. BODYTRACK (App)
     elif benchmark == "bodytrack":
+        bin_path = f"{parsec_root}/pkgs/apps/bodytrack/inst/riscv64-linux.gcc-hooks/bin/bodytrack"
+        input_map = {
+            "test": ("4", "1", "100", "5", "0"),
+            "simsmall": ("4", "1", "1000", "5", "0"),
+            "simmedium": ("4", "2", "2000", "5", "0"),
+            "simlarge": ("4", "4", "4000", "5", "0"),
+        }
+        cams, frames, particles, layers, mode = input_map.get(
+            size, ("4", "1", "1000", "5", "0")
+        )
         seq_dir = f"{parsec_root}/pkgs/apps/bodytrack/inputs/sequence"
-        cmds.append(f"{parsec_root}/pkgs/apps/bodytrack/inst/riscv64-linux.gcc-hooks/bin/bodytrack {seq_dir} 4 4 1000 5 {threads} 0")
+
+        cmds.extend([
+            "mkdir -p /tmp/bt_run",
+            f"{bin_path} {seq_dir} {cams} {frames} {particles} {layers} {threads} {mode}",
+        ])
+
+    # 4. STREAMCLUSTER (Kernel)
     elif benchmark == "streamcluster":
-        cmds.append(f"{parsec_root}/pkgs/kernels/streamcluster/inst/riscv64-linux.gcc-hooks/bin/streamcluster 10 20 32 4096 4096 1000 none /tmp/sc_output.txt {threads}")
+        bin_path = f"{parsec_root}/pkgs/kernels/streamcluster/inst/riscv64-linux.gcc-hooks/bin/streamcluster"
+        input_map = {
+            "test": ("10", "20", "32", "10", "10", "1000"),
+            "simsmall": ("10", "20", "32", "4096", "4096", "1000"),
+            "simmedium": ("10", "20", "32", "8192", "8192", "1000"),
+            "simlarge": ("10", "20", "64", "65536", "65536", "1000"),
+        }
+        k1, k2, dim, npoints, chunk, clusters = input_map.get(
+            size, ("10", "20", "32", "4096", "4096", "1000")
+        )
+
+        cmds.extend([
+            "mkdir -p /tmp/sc_run",
+            f"{bin_path} {k1} {k2} {dim} {npoints} {chunk} {clusters} none /tmp/sc_run/output.txt {threads}",
+        ])
+
+    # 5. FLUIDANIMATE (App)
     elif benchmark == "fluidanimate":
-        input_file = f"{parsec_root}/pkgs/apps/fluidanimate/inputs/in_35k.fluid"
-        cmds.append(f"{parsec_root}/pkgs/apps/fluidanimate/inst/riscv64-linux.gcc-hooks/bin/fluidanimate {threads} 5 {input_file} /tmp/fluid.out")
+        bin_path = f"{parsec_root}/pkgs/apps/fluidanimate/inst/riscv64-linux.gcc-hooks/bin/fluidanimate"
+        input_map = {
+            "test": ("in_15K.fluid", "5"),
+            "simsmall": ("in_35K.fluid", "5"),
+            "simmedium": ("in_100K.fluid", "15"),
+            "simlarge": ("in_300K.fluid", "500"),
+        }
+        input_file_name, frames = input_map.get(size, ("in_35K.fluid", "5"))
+        input_file = (
+            f"{parsec_root}/pkgs/apps/fluidanimate/inputs/{input_file_name}"
+        )
+
+        cmds.extend([
+            "mkdir -p /tmp/fluid_run",
+            f"{bin_path} {threads} {frames} {input_file} /tmp/fluid_run/fluid.out",
+        ])
+
+    # 6. BLACKSCHOLES (App)
     elif benchmark == "blackscholes":
-        input_file = f"{parsec_root}/pkgs/apps/blackscholes/inputs/in_4K.txt"
-        cmds.append(f"{parsec_root}/pkgs/apps/blackscholes/inst/riscv64-linux.gcc-hooks/bin/blackscholes {threads} {input_file} /tmp/prices.txt")
+        bin_path = f"{parsec_root}/pkgs/apps/blackscholes/inst/riscv64-linux.gcc-hooks/bin/blackscholes"
+        input_map = {
+            "test": "in_4.txt",
+            "simsmall": "in_4K.txt",
+            "simmedium": "in_16K.txt",
+            "simlarge": "in_64K.txt",
+        }
+        input_file_name = input_map.get(size, "in_4K.txt")
+        official_input = f"{parsec_root}/pkgs/apps/blackscholes/inputs/{input_file_name}"
+
+        cmds.extend([
+            "mkdir -p /tmp/bs_run",
+            f'if [ -f "{official_input}" ]; then INPUT_PATH="{official_input}"; else '
+            f'echo "1000" > /tmp/bs_run/in_1K.txt && '
+            f'awk \'BEGIN {{ for(i=0;i<1000;i++) print "100.0 100.0 0.05 0.20 1.0 0 0.0" }}\' >> /tmp/bs_run/in_1K.txt && '
+            f'INPUT_PATH="/tmp/bs_run/in_1K.txt"; fi',
+            f"{bin_path} {threads} $INPUT_PATH /tmp/bs_run/prices.txt",
+        ])
+
     else:
-        raise ValueError(f"Unsupported benchmark '{benchmark}'.")
+        raise ValueError(
+            f"Unsupported benchmark '{benchmark}'. Choose from: dedup, canneal, bodytrack, streamcluster, fluidanimate, blackscholes."
+        )
 
     cmds.append("m5 exit")
     return "\n".join(cmds)
