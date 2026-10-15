@@ -349,8 +349,8 @@ else:
 # parsec command
     command = (
         f"cd /home/gem5/parsec-benchmark;"
-        + "source env.sh;"
-        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size}         -n 4;"
+        + ". ./env.sh;"  # Replaced "source env.sh;" with ". ./env.sh;"
+        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size} -n 4;"
         + "sleep 5;"
         + "m5 exit;"
     )

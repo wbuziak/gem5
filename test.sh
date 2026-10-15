@@ -8,7 +8,6 @@ configs="
   encryption_only
   hashing+encryption
   full_security
-  configurable
   "
 
 for curr in $configs; do
