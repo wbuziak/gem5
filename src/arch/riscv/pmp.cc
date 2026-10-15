@@ -242,9 +242,8 @@ PMP::pmpUpdateRule(uint32_t pmp_index)
     }
 
     // update ePMP table
-    //printf("src/arch/riscv/pmp.cc: pmpAddr: 0x%08x\n", this_cfg);
     memCtrl->epmpTable.pmpEntries[pmp_index].rawAddr = this_addr;
-    printf("src/arch/riscv/pmp.cc:247 Updating pmpAddr: 0x%08x\n", this_addr);
+    //printf("src/arch/riscv/pmp.cc:247 Updating pmpAddr: 0x%08x\n", this_addr);
 }
 
 void
