@@ -228,22 +228,33 @@ parser.add_argument(
 args = parser.parse_args()
 
 # helper for parsec command
-def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int = 4) -> str:
-    """Generates multiline guest OS shell scripts for PARSEC 3.0 benchmarks."""
+def get_parsec_workload_cmd(
+    benchmark: str, size: str = "simsmall", threads: int = 4
+) -> str:
+    """Generates robust POSIX guest OS shell scripts for PARSEC 3.0 benchmarks
+
+    on RISC-V gem5 full-system simulations, with dynamic input resolution.
+    """
     parsec_root = "/home/gem5/parsec-benchmark"
     hooks_lib = (
         f"{parsec_root}/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib"
     )
 
-    cmds = [f"export LD_LIBRARY_PATH={hooks_lib}:$LD_LIBRARY_PATH"]
+    lib_paths = f"{hooks_lib}:/lib:/usr/lib:/usr/local/lib"
 
-    # 1. DEDUP (Kernel)
+    cmds = [
+        "#!/bin/sh",
+        f"export LD_LIBRARY_PATH={lib_paths}:$LD_LIBRARY_PATH",
+        "echo '=== STARTING PARSEC WORKLOAD EXECUTION ==='",
+    ]
+
+    # 1. DEDUP (Kernel: pkgs/kernels/dedup)
     if benchmark == "dedup":
+        bin_path = f"{parsec_root}/pkgs/kernels/dedup/inst/riscv64-linux.gcc-hooks/bin/dedup"
         cmds.extend([
             "mkdir -p /tmp/dedup_run",
-            "dd if=/dev/urandom of=/tmp/dedup_run/media.dat bs=1M count=10",
-            f"{parsec_root}/pkgs/kernels/dedup/inst/riscv64-linux.gcc-hooks/bin/dedup "
-            f"-c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp",
+            "dd if=/dev/urandom of=/tmp/dedup_run/media.dat bs=1M count=10 2>/dev/null",
+            f"{bin_path} -c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp",
         ])
 
     # 2. CANNEAL (Kernel: pkgs/kernels/canneal)
@@ -251,55 +262,53 @@ def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int
         bin_path = f"{parsec_root}/pkgs/kernels/canneal/inst/riscv64-linux.gcc-hooks/bin/canneal"
         inputs_dir = f"{parsec_root}/pkgs/kernels/canneal/inputs"
         input_map = {
-            "test": ("input_test.tar", "2500.nets", "100", "300", "2"),
-            "simsmall": ("input_simsmall.tar", "100000.nets", "100", "300", "2"),
-            "simmedium": ("input_simmedium.tar", "200000.nets", "15000", "2000", "32"),
-            "simlarge": ("input_simlarge.tar", "400000.nets", "15000", "2000", "32"),
+            "test": ("2500.nets", "100", "300", "2"),
+            "simsmall": ("100000.nets", "100", "300", "2"),
+            "simmedium": ("200000.nets", "15000", "2000", "32"),
+            "simlarge": ("400000.nets", "15000", "2000", "32"),
         }
-        tar_name, netlist_name, swaps, temp, steps = input_map.get(
-            size, ("input_simsmall.tar", "100000.nets", "100", "300", "2")
+        netlist_name, swaps, temp, steps = input_map.get(
+            size, ("100000.nets", "100", "300", "2")
         )
 
         cmds.extend([
             "mkdir -p /tmp/canneal_run",
-            f"mkdir -p {inputs_dir}",
-            f"cd {inputs_dir}",
-            f'if [ ! -f "{netlist_name}" ] && [ -f "{tar_name}" ]; then tar -xf "{tar_name}"; fi',
-            f'NETLIST_PATH=$(ls {inputs_dir}/*.nets 2>/dev/null | head -n 1)',
-            f"{bin_path} {threads} {swaps} {temp} $NETLIST_PATH {steps}",
+            f'NETLIST="{inputs_dir}/{netlist_name}"',
+            f'if [ ! -f "$NETLIST" ]; then NETLIST=$(ls {inputs_dir}/*.nets 2>/dev/null | tail -n 1); fi',
+            'if [ -z "$NETLIST" ] || [ ! -f "$NETLIST" ]; then '
+            'NETLIST="/tmp/canneal_run/test.nets"; '
+            'echo "100 50" > "$NETLIST"; '
+            "i=0; while [ $i -lt 50 ]; do echo \"1 $i $((i+1))\" >> \"$NETLIST\"; i=$((i+1)); done; "
+            "fi",
+            'echo "Running CANNEAL with netlist: $NETLIST"',
+            f'{bin_path} {threads} {swaps} {temp} "$NETLIST" {steps}',
         ])
 
-    # 3. BODYTRACK (App)
+    # 3. BODYTRACK (App: pkgs/apps/bodytrack)
     elif benchmark == "bodytrack":
         bin_path = f"{parsec_root}/pkgs/apps/bodytrack/inst/riscv64-linux.gcc-hooks/bin/bodytrack"
         inputs_dir = f"{parsec_root}/pkgs/apps/bodytrack/inputs"
-
         input_map = {
-            "test": ("input_test.tar", "4", "1", "100", "5", "0"),
-            "simsmall": ("input_simsmall.tar", "4", "1", "1000", "5", "0"),
-            "simmedium": ("input_simmedium.tar", "4", "2", "2000", "5", "0"),
-            "simlarge": ("input_simlarge.tar", "4", "4", "4000", "5", "0"),
+            "test": ("4", "1", "100", "5", "0"),
+            "simsmall": ("4", "1", "1000", "5", "0"),
+            "simmedium": ("4", "2", "2000", "5", "0"),
+            "simlarge": ("4", "4", "4000", "5", "0"),
         }
-        tar_name, cams, frames, particles, layers, mode = input_map.get(
-            size, ("input_simsmall.tar", "4", "1", "1000", "5", "0")
+        cams, frames, particles, layers, mode = input_map.get(
+            size, ("4", "1", "1000", "5", "0")
         )
 
         cmds.extend([
             "mkdir -p /tmp/bt_run",
-            f"mkdir -p {inputs_dir}",
-            f"cd {inputs_dir}",
-            # 1. Untar if CALIB directory is not extracted yet
-            f'if [ ! -d "{inputs_dir}/CALIB" ] && [ ! -d "{inputs_dir}/sequence/CALIB" ] && [ -f "{inputs_dir}/{tar_name}" ]; then '
-            f'tar -xf "{inputs_dir}/{tar_name}"; fi',
-            # 2. Dynamically locate the sequence directory containing CALIB/
-            f'CALIB_FILE=$(find {inputs_dir} -name "Camera1.cal" 2>/dev/null | head -n 1)',
-            'SEQ_DIR=$(dirname $(dirname "$CALIB_FILE"))',
-            # 3. Fallback if sequence path resolution fails
-            f'if [ -z "$SEQ_DIR" ]; then SEQ_DIR="{inputs_dir}"; fi',
-            f"{bin_path} $SEQ_DIR {cams} {frames} {particles} {layers} {threads} {mode}",
+            'SEQ_DIR=""',
+            f'for d in "{inputs_dir}"/* "{inputs_dir}"; do '
+            'if [ -d "$d/CALIB" ]; then SEQ_DIR="$d"; break; fi; done',
+            'if [ -z "$SEQ_DIR" ]; then echo "ERROR: Bodytrack CALIB directory missing"; m5 exit; fi',
+            'echo "Running BODYTRACK with seq dir: $SEQ_DIR"',
+            f'{bin_path} "$SEQ_DIR" {cams} {frames} {particles} {layers} {threads} {mode}',
         ])
 
-    # 4. STREAMCLUSTER (Kernel)
+    # 4. STREAMCLUSTER (Kernel: pkgs/kernels/streamcluster)
     elif benchmark == "streamcluster":
         bin_path = f"{parsec_root}/pkgs/kernels/streamcluster/inst/riscv64-linux.gcc-hooks/bin/streamcluster"
         input_map = {
@@ -314,67 +323,60 @@ def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int
 
         cmds.extend([
             "mkdir -p /tmp/sc_run",
+            'echo "Running STREAMCLUSTER"',
             f"{bin_path} {k1} {k2} {dim} {npoints} {chunk} {clusters} none /tmp/sc_run/output.txt {threads}",
         ])
 
-    # 5. FLUIDANIMATE (App)
+    # 5. FLUIDANIMATE (App: pkgs/apps/fluidanimate)
     elif benchmark == "fluidanimate":
         bin_path = f"{parsec_root}/pkgs/apps/fluidanimate/inst/riscv64-linux.gcc-hooks/bin/fluidanimate"
         inputs_dir = f"{parsec_root}/pkgs/apps/fluidanimate/inputs"
-
         input_map = {
-            "test": ("input_test.tar", "in_5K.fluid", "5"),
-            "simsmall": ("input_simsmall.tar", "in_35K.fluid", "5"),
-            "simmedium": ("input_simmedium.tar", "in_100K.fluid", "15"),
-            "simlarge": ("input_simlarge.tar", "in_300K.fluid", "500"),
+            "test": ("in_5K.fluid", "5"),
+            "simsmall": ("in_35K.fluid", "5"),
+            "simmedium": ("in_100K.fluid", "15"),
+            "simlarge": ("in_300K.fluid", "500"),
         }
-        tar_name, target_fluid, frames = input_map.get(
-            size, ("input_simsmall.tar", "in_35K.fluid", "5")
-        )
+        target_fluid, frames = input_map.get(size, ("in_35K.fluid", "5"))
 
         cmds.extend([
             "mkdir -p /tmp/fluid_run",
-            f"mkdir -p {inputs_dir}",
-            f"cd {inputs_dir}",
-            # Extract input archive if no .fluid file is present
-            f'if [ $(ls {inputs_dir}/*.fluid 2>/dev/null | wc -l) -eq 0 ] && [ -f "{inputs_dir}/{tar_name}" ]; then '
-            f'tar -xf "{inputs_dir}/{tar_name}"; fi',
-            # Dynamic fallback: pick target_fluid if exists, otherwise grab whatever .fluid file was extracted
-            f'if [ -f "{inputs_dir}/{target_fluid}" ]; then FLUID_INPUT="{inputs_dir}/{target_fluid}"; '
-            f'else FLUID_INPUT=$(ls {inputs_dir}/*.fluid 2>/dev/null | head -n 1); fi',
-            f"{bin_path} {threads} {frames} \"$FLUID_INPUT\" /tmp/fluid_run/fluid.out",
+            f'FLUID_INPUT="{inputs_dir}/{target_fluid}"',
+            f'if [ ! -f "$FLUID_INPUT" ]; then FLUID_INPUT=$(ls {inputs_dir}/*.fluid 2>/dev/null | tail -n 1); fi',
+            'if [ -z "$FLUID_INPUT" ] || [ ! -f "$FLUID_INPUT" ]; then echo "ERROR: No .fluid input file found"; m5 exit; fi',
+            'echo "Running FLUIDANIMATE with file: $FLUID_INPUT"',
+            f'{bin_path} {threads} {frames} "$FLUID_INPUT" /tmp/fluid_run/fluid.out',
         ])
 
-    # 6. BLACKSCHOLES (App)
+    # 6. BLACKSCHOLES (App: pkgs/apps/blackscholes)
     elif benchmark == "blackscholes":
         bin_path = f"{parsec_root}/pkgs/apps/blackscholes/inst/riscv64-linux.gcc-hooks/bin/blackscholes"
         inputs_dir = f"{parsec_root}/pkgs/apps/blackscholes/inputs"
-
         input_map = {
-            "test": ("input_test.tar", "in_4.txt"),
-            "simsmall": ("input_simsmall.tar", "in_4K.txt"),
-            "simmedium": ("input_simmedium.tar", "in_16K.txt"),
-            "simlarge": ("input_simlarge.tar", "in_64K.txt"),
+            "test": "in_4.txt",
+            "simsmall": "in_4K.txt",
+            "simmedium": "in_16K.txt",
+            "simlarge": "in_64K.txt",
         }
-        tar_name, txt_name = input_map.get(
-            size, ("input_simsmall.tar", "in_4K.txt")
-        )
+        txt_name = input_map.get(size, "in_4K.txt")
 
         cmds.extend([
             "mkdir -p /tmp/bs_run",
-            f"mkdir -p {inputs_dir}",
-            f'if [ -f "{inputs_dir}/{tar_name}" ]; then tar -xf "{inputs_dir}/{tar_name}" -C "{inputs_dir}"; fi',
-            f'if [ -f "{inputs_dir}/{txt_name}" ]; then INPUT_PATH="{inputs_dir}/{txt_name}"; else '
-            f'echo "1000" > /tmp/bs_run/in_1K.txt && '
-            f'awk \'BEGIN {{ for(i=0;i<1000;i++) print "100.0 100.0 0.05 0.10 0.20 1.0 P 0.0 0.0" }}\' >> /tmp/bs_run/in_1K.txt && '
-            f'INPUT_PATH="/tmp/bs_run/in_1K.txt"; fi',
-            f"{bin_path} {threads} $INPUT_PATH /tmp/bs_run/prices.txt",
+            f'INPUT_PATH="{inputs_dir}/{txt_name}"',
+            f'if [ ! -f "$INPUT_PATH" ]; then INPUT_PATH=$(ls {inputs_dir}/*.txt 2>/dev/null | tail -n 1); fi',
+            'if [ -z "$INPUT_PATH" ] || [ ! -f "$INPUT_PATH" ]; then '
+            'INPUT_PATH="/tmp/bs_run/in_100.txt"; '
+            'echo "100" > "$INPUT_PATH"; '
+            "i=0; while [ $i -lt 100 ]; do echo \"100.0 100.0 0.05 0.10 0.20 1.0 P 0.0 0.0\" >> \"$INPUT_PATH\"; i=$((i+1)); done; "
+            "fi",
+            'echo "Running BLACKSCHOLES with file: $INPUT_PATH"',
+            f'{bin_path} {threads} "$INPUT_PATH" /tmp/bs_run/prices.txt',
         ])
-    else:
-        raise ValueError(
-            f"Unsupported benchmark '{benchmark}'. Choose from: dedup, canneal, bodytrack, streamcluster, fluidanimate, blackscholes."
-        )
 
+    else:
+        raise ValueError(f"Unsupported benchmark '{benchmark}'")
+
+    cmds.append("echo '=== BENCHMARK FINISHED OR EXITED ==='")
     cmds.append("m5 exit")
     return "\n".join(cmds)
 
