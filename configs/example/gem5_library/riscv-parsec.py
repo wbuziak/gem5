@@ -227,6 +227,39 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+# helper for parsec command
+def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int = 4) -> str:
+    parsec_root = "/home/gem5/parsec-benchmark"
+    hooks_lib = f"{parsec_root}/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib"
+
+    cmds = [f"export LD_LIBRARY_PATH={hooks_lib}:$LD_LIBRARY_PATH"]
+
+    if benchmark == "dedup":
+        cmds.extend([
+            "mkdir -p /tmp/dedup_run",
+            "dd if=/dev/urandom of=/tmp/dedup_run/media.dat bs=1M count=10",
+            f"{parsec_root}/pkgs/kernels/dedup/inst/riscv64-linux.gcc-hooks/bin/dedup -c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp",
+        ])
+    elif benchmark == "canneal":
+        netlist = f"{parsec_root}/pkgs/apps/canneal/inputs/100000.nets"
+        cmds.append(f"{parsec_root}/pkgs/apps/canneal/inst/riscv64-linux.gcc-hooks/bin/canneal {threads} 10000 2000 {netlist} 32")
+    elif benchmark == "bodytrack":
+        seq_dir = f"{parsec_root}/pkgs/apps/bodytrack/inputs/sequence"
+        cmds.append(f"{parsec_root}/pkgs/apps/bodytrack/inst/riscv64-linux.gcc-hooks/bin/bodytrack {seq_dir} 4 4 1000 5 {threads} 0")
+    elif benchmark == "streamcluster":
+        cmds.append(f"{parsec_root}/pkgs/kernels/streamcluster/inst/riscv64-linux.gcc-hooks/bin/streamcluster 10 20 32 4096 4096 1000 none /tmp/sc_output.txt {threads}")
+    elif benchmark == "fluidanimate":
+        input_file = f"{parsec_root}/pkgs/apps/fluidanimate/inputs/in_35k.fluid"
+        cmds.append(f"{parsec_root}/pkgs/apps/fluidanimate/inst/riscv64-linux.gcc-hooks/bin/fluidanimate {threads} 5 {input_file} /tmp/fluid.out")
+    elif benchmark == "blackscholes":
+        input_file = f"{parsec_root}/pkgs/apps/blackscholes/inputs/in_4K.txt"
+        cmds.append(f"{parsec_root}/pkgs/apps/blackscholes/inst/riscv64-linux.gcc-hooks/bin/blackscholes {threads} {input_file} /tmp/prices.txt")
+    else:
+        raise ValueError(f"Unsupported benchmark '{benchmark}'.")
+
+    cmds.append("m5 exit")
+    return "\n".join(cmds)
+
 cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
     l1d_size="32KiB",
     l1i_size="32KiB",
@@ -347,13 +380,10 @@ if (args.benchmark == "microbenchmark"):
     #""" # background process w/ '&' operator
 else:
 # parsec command
-    command = (
-        f"cd /home/gem5/parsec-benchmark;"
-        + ". ./env.sh;"  # Replaced "source env.sh;" with ". ./env.sh;"
-        + "export LD_LIBRARY_PATH=/home/gem5/parsec-benchmark/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib:$LD_LIBRARY_PATH;"
-        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size} -n 4;"
-        + "sleep 5;"
-        + "m5 exit;"
+    command = get_parsec_workload_cmd(
+        benchmark=args.benchmark,
+        size=args.size,
+        threads=4
     )
 
 board.set_kernel_disk_workload(
