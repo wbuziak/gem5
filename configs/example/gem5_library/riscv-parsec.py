@@ -309,20 +309,29 @@ def get_parsec_workload_cmd(benchmark: str, size: str = "simsmall", threads: int
     # 5. FLUIDANIMATE (App)
     elif benchmark == "fluidanimate":
         bin_path = f"{parsec_root}/pkgs/apps/fluidanimate/inst/riscv64-linux.gcc-hooks/bin/fluidanimate"
+        inputs_dir = f"{parsec_root}/pkgs/apps/fluidanimate/inputs"
+
         input_map = {
-            "test": ("in_15K.fluid", "5"),
-            "simsmall": ("in_35K.fluid", "5"),
-            "simmedium": ("in_100K.fluid", "15"),
-            "simlarge": ("in_300K.fluid", "500"),
+            "test": ("input_test.tar", "in_5K.fluid", "5"),
+            "simsmall": ("input_simsmall.tar", "in_35K.fluid", "5"),
+            "simmedium": ("input_simmedium.tar", "in_100K.fluid", "15"),
+            "simlarge": ("input_simlarge.tar", "in_300K.fluid", "500"),
         }
-        input_file_name, frames = input_map.get(size, ("in_35K.fluid", "5"))
-        input_file = (
-            f"{parsec_root}/pkgs/apps/fluidanimate/inputs/{input_file_name}"
+        tar_name, target_fluid, frames = input_map.get(
+            size, ("input_simsmall.tar", "in_35K.fluid", "5")
         )
 
         cmds.extend([
             "mkdir -p /tmp/fluid_run",
-            f"{bin_path} {threads} {frames} {input_file} /tmp/fluid_run/fluid.out",
+            f"mkdir -p {inputs_dir}",
+            f"cd {inputs_dir}",
+            # Extract input archive if no .fluid file is present
+            f'if [ $(ls {inputs_dir}/*.fluid 2>/dev/null | wc -l) -eq 0 ] && [ -f "{inputs_dir}/{tar_name}" ]; then '
+            f'tar -xf "{inputs_dir}/{tar_name}"; fi',
+            # Dynamic fallback: pick target_fluid if exists, otherwise grab whatever .fluid file was extracted
+            f'if [ -f "{inputs_dir}/{target_fluid}" ]; then FLUID_INPUT="{inputs_dir}/{target_fluid}"; '
+            f'else FLUID_INPUT=$(ls {inputs_dir}/*.fluid 2>/dev/null | head -n 1); fi',
+            f"{bin_path} {threads} {frames} \"$FLUID_INPUT\" /tmp/fluid_run/fluid.out",
         ])
 
     # 6. BLACKSCHOLES (App)
