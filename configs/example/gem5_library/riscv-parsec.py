@@ -227,169 +227,6 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-# helper for parsec command
-def get_parsec_workload_cmd(
-    benchmark: str, size: str = "simsmall", threads: int = 4
-) -> str:
-    """Generates robust POSIX guest OS shell scripts for PARSEC 3.0 benchmarks
-
-    on RISC-V gem5 full-system simulations with explicit dynamic linking.
-    """
-    parsec_root = "/home/gem5/parsec-benchmark"
-    hooks_lib = (
-        f"{parsec_root}/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib"
-    )
-
-    # Added /usr/lib/riscv64-linux-gnu to resolve libstdc++.so.6
-    lib_paths = f"{hooks_lib}:/usr/lib/riscv64-linux-gnu:/lib:/usr/lib"
-
-    cmds = [
-        "#!/bin/sh",
-        f"export LD_LIBRARY_PATH={lib_paths}:$LD_LIBRARY_PATH",
-        "echo '=== LD_LIBRARY_PATH ==='",
-        "echo $LD_LIBRARY_PATH",
-    ]
-
-    # Helper wrapper to print dynamic dependencies and capture standard error
-    def wrap_run(bin_path: str, run_cmd: str) -> list[str]:
-        return [
-            f"echo '=== LDD CHECK FOR {bin_path} ==='",
-            f"ldd {bin_path} 2>/dev/null || true",
-            f"echo '=== EXECUTING: {run_cmd} ==='",
-            f"{run_cmd} 2>/tmp/err.log || {{ echo 'EXECUTION FAILED:'; cat /tmp/err.log; m5 exit; }}",
-        ]
-
-    # 1. DEDUP (Kernel)
-    if benchmark == "dedup":
-        bin_path = f"{parsec_root}/pkgs/kernels/dedup/inst/riscv64-linux.gcc-hooks/bin/dedup"
-        run_cmd = f"{bin_path} -c -p -v -t {threads} -i /tmp/dedup_run/media.dat -o /tmp/dedup_run/output.ddp"
-        cmds.extend([
-            "mkdir -p /tmp/dedup_run",
-            "dd if=/dev/urandom of=/tmp/dedup_run/media.dat bs=1M count=10 2>/dev/null",
-        ])
-        cmds.extend(wrap_run(bin_path, run_cmd))
-
-    # 2. CANNEAL (Kernel)
-    elif benchmark == "canneal":
-        bin_path = f"{parsec_root}/pkgs/kernels/canneal/inst/riscv64-linux.gcc-hooks/bin/canneal"
-        inputs_dir = f"{parsec_root}/pkgs/kernels/canneal/inputs"
-        input_map = {
-            "test": ("100.nets", "100", "300", "2"),
-            "simsmall": ("100000.nets", "100", "300", "2"),
-            "simmedium": ("200000.nets", "15000", "2000", "32"),
-            "simlarge": ("400000.nets", "15000", "2000", "32"),
-        }
-        target_netlist, swaps, temp, steps = input_map.get(
-            size, ("100000.nets", "100", "300", "2")
-        )
-
-        cmds.extend([
-            "mkdir -p /tmp/canneal_run",
-            f'NETLIST="{inputs_dir}/{target_netlist}"',
-            f'if [ ! -f "$NETLIST" ]; then NETLIST=$(ls {inputs_dir}/*.nets 2>/dev/null | tail -n 1); fi',
-            'if [ -z "$NETLIST" ] || [ ! -f "$NETLIST" ]; then '
-            'NETLIST="/tmp/canneal_run/test.nets"; '
-            'echo "100 50" > "$NETLIST"; '
-            "i=0; while [ $i -lt 50 ]; do echo \"1 $i $((i+1))\" >> \"$NETLIST\"; i=$((i+1)); done; "
-            "fi",
-        ])
-        run_cmd = f'{bin_path} {threads} {swaps} {temp} "$NETLIST" {steps}'
-        cmds.extend(wrap_run(bin_path, run_cmd))
-
-    # 3. BODYTRACK (App)
-    elif benchmark == "bodytrack":
-        bin_path = f"{parsec_root}/pkgs/apps/bodytrack/inst/riscv64-linux.gcc-hooks/bin/bodytrack"
-        inputs_dir = f"{parsec_root}/pkgs/apps/bodytrack/inputs"
-        input_map = {
-            "test": ("4", "1", "100", "5", "0"),
-            "simsmall": ("4", "1", "1000", "5", "0"),
-            "simmedium": ("4", "2", "2000", "5", "0"),
-            "simlarge": ("4", "4", "4000", "5", "0"),
-        }
-        cams, frames, particles, layers, mode = input_map.get(
-            size, ("4", "1", "1000", "5", "0")
-        )
-
-        cmds.extend([
-            "mkdir -p /tmp/bt_run",
-            'SEQ_DIR=""',
-            f'for d in "{inputs_dir}"/* "{inputs_dir}"; do '
-            'if [ -d "$d/CALIB" ]; then SEQ_DIR="$d"; break; fi; done',
-            'if [ -z "$SEQ_DIR" ]; then echo "ERROR: Bodytrack CALIB directory missing"; m5 exit; fi',
-        ])
-        run_cmd = f'{bin_path} "$SEQ_DIR" {cams} {frames} {particles} {layers} {threads} {mode}'
-        cmds.extend(wrap_run(bin_path, run_cmd))
-
-    # 4. STREAMCLUSTER (Kernel)
-    elif benchmark == "streamcluster":
-        bin_path = f"{parsec_root}/pkgs/kernels/streamcluster/inst/riscv64-linux.gcc-hooks/bin/streamcluster"
-        input_map = {
-            "test": ("10", "20", "32", "10", "10", "1000"),
-            "simsmall": ("10", "20", "32", "4096", "4096", "1000"),
-            "simmedium": ("10", "20", "32", "8192", "8192", "1000"),
-            "simlarge": ("10", "20", "64", "65536", "65536", "1000"),
-        }
-        k1, k2, dim, npoints, chunk, clusters = input_map.get(
-            size, ("10", "20", "32", "4096", "4096", "1000")
-        )
-
-        cmds.append("mkdir -p /tmp/sc_run")
-        run_cmd = f"{bin_path} {k1} {k2} {dim} {npoints} {chunk} {clusters} none /tmp/sc_run/output.txt {threads}"
-        cmds.extend(wrap_run(bin_path, run_cmd))
-
-    # 5. FLUIDANIMATE (App)
-    elif benchmark == "fluidanimate":
-        bin_path = f"{parsec_root}/pkgs/apps/fluidanimate/inst/riscv64-linux.gcc-hooks/bin/fluidanimate"
-        inputs_dir = f"{parsec_root}/pkgs/apps/fluidanimate/inputs"
-        input_map = {
-            "test": ("in_15K.fluid", "5"),
-            "simsmall": ("in_35K.fluid", "5"),
-            "simmedium": ("in_100K.fluid", "15"),
-            "simlarge": ("in_300K.fluid", "500"),
-        }
-        target_fluid, frames = input_map.get(size, ("in_35K.fluid", "5"))
-
-        cmds.extend([
-            "mkdir -p /tmp/fluid_run",
-            f'FLUID_INPUT="{inputs_dir}/{target_fluid}"',
-            f'if [ ! -f "$FLUID_INPUT" ]; then FLUID_INPUT=$(ls {inputs_dir}/*.fluid 2>/dev/null | tail -n 1); fi',
-            'if [ -z "$FLUID_INPUT" ] || [ ! -f "$FLUID_INPUT" ]; then echo "ERROR: No .fluid input file found"; m5 exit; fi',
-        ])
-        run_cmd = f'{bin_path} {threads} {frames} "$FLUID_INPUT" /tmp/fluid_run/fluid.out'
-        cmds.extend(wrap_run(bin_path, run_cmd))
-
-    # 6. BLACKSCHOLES (App)
-    elif benchmark == "blackscholes":
-        bin_path = f"{parsec_root}/pkgs/apps/blackscholes/inst/riscv64-linux.gcc-hooks/bin/blackscholes"
-        inputs_dir = f"{parsec_root}/pkgs/apps/blackscholes/inputs"
-        input_map = {
-            "test": "in_16.txt",
-            "simsmall": "in_4K.txt",
-            "simmedium": "in_16K.txt",
-            "simlarge": "in_64K.txt",
-        }
-        txt_name = input_map.get(size, "in_4K.txt")
-
-        cmds.extend([
-            "mkdir -p /tmp/bs_run",
-            f'INPUT_PATH="{inputs_dir}/{txt_name}"',
-            f'if [ ! -f "$INPUT_PATH" ]; then INPUT_PATH=$(ls {inputs_dir}/*.txt 2>/dev/null | tail -n 1); fi',
-            'if [ -z "$INPUT_PATH" ] || [ ! -f "$INPUT_PATH" ]; then '
-            'INPUT_PATH="/tmp/bs_run/in_100.txt"; '
-            'echo "100" > "$INPUT_PATH"; '
-            "i=0; while [ $i -lt 100 ]; do echo \"100.0 100.0 0.05 0.10 0.20 1.0 P 0.0 0.0\" >> \"$INPUT_PATH\"; i=$((i+1)); done; "
-            "fi",
-        ])
-        run_cmd = f'{bin_path} {threads} "$INPUT_PATH" /tmp/bs_run/prices.txt'
-        cmds.extend(wrap_run(bin_path, run_cmd))
-
-    else:
-        raise ValueError(f"Unsupported benchmark '{benchmark}'")
-
-    cmds.append("echo '=== BENCHMARK COMPLETED SUCCESSFULLY ==='")
-    cmds.append("m5 exit")
-    return "\n".join(cmds)
-
 cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
     l1d_size="32KiB",
     l1i_size="32KiB",
@@ -510,10 +347,13 @@ if (args.benchmark == "microbenchmark"):
     #""" # background process w/ '&' operator
 else:
 # parsec command
-    command = get_parsec_workload_cmd(
-        benchmark=args.benchmark,
-        size=args.size,
-        threads=4
+    command = (
+        f"cd /home/gem5/parsec-benchmark;"
+        + ". ./env.sh;"  # Replaced "source env.sh;" with ". ./env.sh;"
+        + "export LD_LIBRARY_PATH=/home/gem5/parsec-benchmark/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib:$LD_LIBRARY_PATH;"
+        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size} -n 4;"
+        + "sleep 5;"
+        + "m5 exit;"
     )
 
 board.set_kernel_disk_workload(
