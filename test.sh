@@ -21,7 +21,7 @@ for curr in $configs; do
   echo ""
   echo "=========================="
   echo ""
-  sh run.sh $BENCHMARK simlarge 4KiB $curr riscv-parsec.py
+  sh run.sh $BENCHMARK simlarge 4KiB $curr riscv-spec.py
 done
 
 echo "Finished running all tests"

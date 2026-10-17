@@ -82,20 +82,60 @@ from gem5.utils.requires import requires
 
 
 benchmark_choices = [
-    "blackscholes",
-    "bodytrack",
-    "canneal",
-    "dedup",
-    "facesim",
-    "ferret",
-    "fluidanimate",
-    "freqmine",
-    "raytrace",
-    "streamcluster",
-    "swaptions",
-    "vips",
-    "x264",
-    "microbenchmark",
+    "706.stockfish_r",
+    "707.ntest_r",
+    "708.sqlite_r",
+    "709.cactus_r",
+    "710.omnetpp_",
+    "714.cpython_r",
+    "721.gcc_r",
+    "722.palm_r",
+    "723.llvm_r",
+    "727.cppcheck_r",
+    "729.abc_r",
+    "731.astcenc_r",
+    "734.vpr_r",
+    "735.gem5_r",
+    "736.ocio_r",
+    "737.gmsh_r",
+    "748.flightdm_r",
+    "749.fotonik3d_r",
+    "750.sealcrypto_r",
+    "753.ns3_r",
+    "765.roms_r",
+    "766.femflow_r",
+    "767.nest_r",
+    "772.marian_r",
+    "777.zstd_r",
+    "782.lbm_r",
+    "800.pot3d_s",
+    "801.xz_s",
+    "803.sph_exa_s",
+    "807.ntest_s",
+    "809.cactus_s",
+    "811.tealeaf_s",
+    "816.nab_s",
+    "817.flac_s",
+    "820.cloverleaf_s",
+    "821.gcc_s",
+    "822.palm_s",
+    "823.llvm_s",
+    "827.cppcheck_s",
+    "829.abc_s",
+    "834.vpr_s",
+    "835.gem5_s",
+    "838.diamond_s",
+    "846.minizinc_s",
+    "849.fotonik3d_s",
+    "853.ns3_s",
+    "854.graph500_s",
+    "857.namd_s",
+    "865.roms_s",
+    "867.nest_s",
+    "872.marian_s",
+    "881.neutron_s",
+    "998.specrand_s",
+    "999.specrand_r",
 ]
 
 # Memory module choices
@@ -335,23 +375,14 @@ if (args.benchmark == "microbenchmark"):
         f"sleep 5;"
         f"m5 exit;"
     )
-    #command = """
-    #  cd ~/repos/microbenchmark
-    #  mkdir -p tmp
-    #  ./bin/micro 500000000 536870900 > tmp/bg_out.log 2>&1 & 
-    #  BG_PID=$!
-    #  ./bin/micro 500000000 536870900 > tmp/fg_out.log 2>&1
-    #  wait $BG_PID
-    #  sleep 5
-    #  m5 exit
-    #""" # background process w/ '&' operator
+
 else:
-# parsec command
+# spec CPU 2026 command
     command = (
-        f"cd /home/gem5/parsec-benchmark;"
-        + ". ./env.sh;"  # Replaced "source env.sh;" with ". ./env.sh;"
-        + "export LD_LIBRARY_PATH=/home/gem5/parsec-benchmark/pkgs/libs/hooks/inst/riscv64-linux.gcc-hooks/lib:$LD_LIBRARY_PATH;"
-        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size} -n 4;"
+        f"cd /home/gem5/spec;"
+        + "source shrc;"
+        + "cd /home/gem5/spec/benchspec/CPU/782.lbm_r/run/run_base_test_riscv64.0000;"
+        + "./lbm_r_base.riscv64 20 reference.dat 0 1 200_200_130_ldc.of;"
         + "sleep 5;"
         + "m5 exit;"
     )
