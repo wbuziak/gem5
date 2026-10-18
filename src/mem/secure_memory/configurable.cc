@@ -1273,7 +1273,7 @@ Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
             assert(parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2));
             return parent->handleTreeResponse(pkt);
         }
-    } else if (parent->isCounter(pkt->getAddr()) && parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2)) {
+    } else if (parent->isCounter(pkt->getAddr()) && parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
         return parent->processCounterResponse(pkt);
     } else {
         assert(parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2));
