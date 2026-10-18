@@ -411,7 +411,6 @@ def handle_workbegin():
     simulator.schedule_max_insts(125000000) # 500 million instructions
     yield False
 
-
 def handle_workend():
     print()
     print("Benchmark finished")
@@ -421,7 +420,11 @@ def handle_workend():
     yield True
 
 def handle_exit():
-    print("Kernel booted. Bypassing exit event.")
+    print("Done booting Linux")
+    print("Resetting stats at the start of ROI!")
+    processor.switch()
+    m5.stats.reset()
+    simulator.schedule_max_insts(125000000) # 500 million instructions
     yield False
 
 def handle_max_insts():
