@@ -420,6 +420,10 @@ def handle_workend():
     print()
     yield True
 
+def handle_exit():
+    print("Kernel booted. Bypassing exit event.")
+    yield False
+
 def handle_max_insts():
     print()
     print("Maximum instructions reached")
@@ -431,6 +435,7 @@ def handle_max_insts():
 simulator = Simulator(
     board=board,
     on_exit_event={
+        ExitEvent.EXIT: handle_exit(),
         ExitEvent.WORKBEGIN: handle_workbegin(),
         ExitEvent.WORKEND: handle_workend(),
         ExitEvent.MAX_INSTS: handle_max_insts(),
