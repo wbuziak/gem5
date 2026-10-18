@@ -378,11 +378,33 @@ if (args.benchmark == "microbenchmark"):
 
 else:
 # spec CPU 2026 command
+    if (args.benchmark == "782.lbm_r"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/782.lbm_r/run/run_base_test_riscv64.0000;" 
+        cmd = "./lbm_r_base.riscv64 20 reference.dat 0 1 200_200_130_ldc.of;" 
+    elif (args.benchmark == "708.sqlite_r"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/708.sqlite_r/run/run_base_refrate_riscv64.0000;"
+        cmd = "./sqlite_r_base.riscv64 < control;"
+        
+    elif (args.benchmark == "721.gcc_r"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/721.gcc_r/run/run_base_test_riscv64.0000;"
+        # gcc takes the C file, optimization flags, and output file
+        cmd = "./gcc_r_base.riscv64 test.c -O5 -fipa-pta -o test.s;"
+        
+    elif (args.benchmark == "706.stockfish_r"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/706.stockfish_r/run/run_base_test_riscv64.0000;"
+        # stockfish takes a configuration/move text file via stdin
+        cmd = "./stockfish_r_base.riscv64 < stockfish_test.in;"
+        
+    elif (args.benchmark == "857.namd_s"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/857.namd_s/run/run_base_test_riscv64.0000;"
+        # namd takes argument flags for the simulation
+        cmd = "./namd_s_base.riscv64 --input apcoa.namd --iterations 1 --output apcoa.out;"
+        
     command = (
         f"cd /home/gem5/spec;"
         + "source shrc;"
-        + "cd /home/gem5/spec/benchspec/CPU/782.lbm_r/run/run_base_test_riscv64.0000;"
-        + "./lbm_r_base.riscv64 20 reference.dat 0 1 200_200_130_ldc.of;"
+        + directory 
+        + cmd
         + "sleep 5;"
         + "m5 exit;"
     )
