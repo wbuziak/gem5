@@ -396,10 +396,9 @@ else:
         cmd = "./stockfish_r_base.riscv64 < stockfish_test.in;"
         
     elif (args.benchmark == "857.namd_s"):
-        directory = "cd /home/gem5/spec/benchspec/CPU/857.namd_s/run/run_base_test_riscv64.0000;"
-        # namd takes argument flags for the simulation
-        cmd = "./namd_s_base.riscv64 --input apcoa.namd --iterations 1 --output apcoa.out;"
-        
+        directory = "cd /home/gem5/spec/benchspec/CPU/857.namd_s/run/run_base_refspeed_riscv64.0000;"
+        cmd = "./namd_s_base.riscv64 --input namd.input --iterations 38 --output namd.out;"
+
     command = (
         f"cd /home/gem5/spec;"
         + "source shrc;"
