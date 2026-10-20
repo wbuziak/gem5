@@ -399,6 +399,10 @@ else:
         directory = "cd /home/gem5/spec/benchspec/CPU/857.namd_s/run/run_base_refspeed_riscv64.0000;"
         cmd = "./namd_s_base.riscv64 --input namd.input --iterations 38 --output namd.out;"
 
+    elif args.benchmark in ["714.cpython_r", "cpython"]:
+        directory = "cd /home/gem5/spec/benchspec/CPU/714.cpython_r/run/run_base_refrate_riscv64.0000;"
+        cmd = "./cpython_r_base.riscv64 -I -B coreml_pb.py -i 2 -a -m Resnet50Headless.mlmodel -d 10;"
+
     command = (
         f"cd /home/gem5/spec;"
         + "source shrc;"

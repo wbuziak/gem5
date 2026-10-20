@@ -467,7 +467,7 @@ Configurable::handleResponse(PacketPtr pkt)
         }
 
         // Wait for MACs ONLY if hashing is enabled
-        if (ePMPSecurity(pkt->getAddr(), pkt->getSize())) {
+        if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
             auto mac_found = mac_fetched.find(pkt->getAddr());
             if (mac_found != mac_fetched.end()) {
                 // we are all set to start the authentication procedure
