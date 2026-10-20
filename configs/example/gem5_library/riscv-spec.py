@@ -82,6 +82,7 @@ from gem5.utils.requires import requires
 
 
 benchmark_choices = [
+    "microbenchmark",
     "706.stockfish_r",
     "707.ntest_r",
     "708.sqlite_r",
