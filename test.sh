@@ -1,6 +1,7 @@
 #!/bin/sh
 
 export BENCHMARK=$1
+export CONFIG=$2
 
 configs="
   no_security
@@ -17,11 +18,11 @@ for curr in $configs; do
   echo "Running $BENCHMARK:"
   echo "  SECURITY CONFIGURATION: $curr"
   echo "  METADATA CACHE SIZE:    4 KiB"
-  echo "  CONFIG FILE:            x86-parsec-configurable.py"
+  echo "  CONFIG FILE:            $2"
   echo ""
   echo "=========================="
   echo ""
-  sh run.sh $BENCHMARK simlarge 4KiB $curr riscv-spec.py
+  sh run.sh $BENCHMARK simlarge 4KiB $curr $CONFIG
 done
 
 echo "Finished running all tests"
