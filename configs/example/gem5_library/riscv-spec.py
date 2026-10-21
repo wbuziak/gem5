@@ -379,7 +379,7 @@ if (args.benchmark == "microbenchmark"):
 
 else:
 # spec CPU 2026 command
-    if (args.benchmark == "7=801.xz_s"):
+    if (args.benchmark == "801.xz_s"):
         directory = "cd /home/gem5/spec/benchspec/CPU/801.xz_s/run/run_base_refspeed_riscv64.0000;"
         cmd = "./xz_s_base.riscv64 input.combined.xz 250 a2f20b0b0058280d771eb5e2820549151db3f423f034d66f616238e833113333 9369400 9375676 2;" 
 
