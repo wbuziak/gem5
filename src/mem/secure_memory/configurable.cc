@@ -115,26 +115,35 @@ Configurable::startup()
     int i;
 
     for (i = 0; i < epmpTable.pmpEntries.size(); i++) {
-        epmpTable.pmpEntries[i].security = secure; // set to full security
-        printf("src/mem/secure_memory/configurable.cc:119 ePMP ENTRY %d SECURE FLAG SET: %d\n", i, secure);
+        epmpTable.pmpEntries[i].security = secure; // set to security flag
     }
+    printf("src/mem/secure_memory/configurable.cc: ePMP ENTRIES SECURE FLAG SET: %d\n", secure);
 
-    // Include metadata in the ePMP table with an artificial entry
-    // Create a lower bound entry (if needed for TOR, or use existing)
+    // Align addresses to avoid truncation during shifting
+    Addr aligned_end = end & ~0x3ULL;
+    Addr aligned_level_start = (level_start + 3) & ~0x3ULL;
+
+    // Create lower bound entry for TOR
     PmpEntry lower_bound;
+<<<<<<< HEAD
     lower_bound.rawAddr = end >> 2; // Shifted for PMP format
     lower_bound.pmpCfg = 0; // PMP_OFF, just acts as a base
     lower_bound.security = secure; // since PMP_OFF this doesn't matter
+=======
+    lower_bound.rawAddr = aligned_end >> 2; 
+    lower_bound.pmpCfg = 0; // PMP_OFF
+    lower_bound.security = secure; 
+>>>>>>> 765cb6facc (bounds check?)
     epmpTable.pmpEntries.push_back(lower_bound);
 
-    // Create the metadata bounds entry
+    // Create metadata bounds entry
     PmpEntry metadata_entry;
-    metadata_entry.rawAddr = level_start >> 2; // level_start is the top of your metadata
-    // Set A-field to PMP_TOR (value 1). Shift to bits 3-4.
-    metadata_entry.pmpCfg = (1 << 3);
-    metadata_entry.security = 7; // Set to whatever your required metadata security mode is
+    metadata_entry.rawAddr = aligned_level_start >> 2; 
+    metadata_entry.pmpCfg = (1 << 3); // PMP_TOR (bits 3-4 = 1)
+    metadata_entry.security = secure; // Security flag for metadata
 
     epmpTable.pmpEntries.push_back(metadata_entry);
+    printf("src/mem/secure_memory/configurable.cc: ePMP METADATA ENTRY SECURE FLAG SET: %d\n", secure);
 
     // Hit rate for deciding when to change security
     metadata_cache_accesses = 0;
@@ -306,6 +315,15 @@ Configurable::handleRequest(PacketPtr pkt)
 {
     if (cipher_queue.size() == max_cipher_size) {
         return false;
+    }
+
+    // BOUNDS CHECK: Prevent speculative out-of-bounds fetches from crashing calculations
+    AddrRangeList ranges = mem_port.getAddrRanges();
+    if (!ranges.front().contains(pkt->getAddr())) {
+        // Address is invalid/out-of-bounds. Forward to memory to let the standard 
+        // system handle the fault/NACK, and skip all security processing.
+        mem_port.sendPacket(pkt);
+        return true; 
     }
 
     // create request for associated metadata
@@ -1384,24 +1402,22 @@ Configurable::pmpDecodeNapot(Addr pmpaddr)
 int
 Configurable::ePMPSecurity(const Addr &paddr, unsigned int size)
 {
-    // Handle 0-size requests safely to avoid underflow
     Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
 
     for (int i = 0; i < epmpTable.pmpEntries.size(); i++) {
         uint8_t cfg = epmpTable.pmpEntries[i].pmpCfg;
         uint8_t a_field = pmpGetAField(cfg);
 
-        // Skip entries with address matching disabled
+        // Do not skip PMP_OFF if it serves as a TOR lower bound for the next entry
         if (a_field == PMP_OFF) {
             continue;
         }
 
-        //  Decode the range based on the address mode (A-field)
         AddrRange pmp_range(0, 0);
-        Addr raw_addr = epmpTable.pmpEntries[i].rawAddr; // Raw unshifted PMP register value
+        Addr raw_addr = epmpTable.pmpEntries[i].rawAddr;
 
         if (a_field == PMP_TOR) {
-            // Top of Range: lower bound is entry (i - 1), upper bound is entry i
+            // Retrieve lower bound directly from previous rawAddr without checking its a_field
             Addr lower = 0;
             if (i > 0) {
                 lower = epmpTable.pmpEntries[i - 1].rawAddr << 2;
@@ -1410,24 +1426,18 @@ Configurable::ePMPSecurity(const Addr &paddr, unsigned int size)
             pmp_range = AddrRange(lower, upper);
 
         } else if (a_field == PMP_NA4) {
-            // Naturally Aligned 4-Byte
             Addr base = raw_addr << 2;
             pmp_range = AddrRange(base, base + 4);
 
         } else if (a_field == PMP_NAPOT) {
-            // Pretty sure everything in gem5 is 
-            // Naturally Aligned Power-of-Two
             pmp_range = pmpDecodeNapot(raw_addr);
         }
 
-        // Match against the dynamically computed range
         if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
-        //    printf("ePMP Entry #%d matched dynamically [%lx - %lx]. Security flag: %d\n", i, pmp_range.start(), pmp_range.end(), epmpTable.pmpEntries[i].security);
             return epmpTable.pmpEntries[i].security;
         }
     }
 
-    // Return -1 if no active entry matches
     return 0;
 }
 
