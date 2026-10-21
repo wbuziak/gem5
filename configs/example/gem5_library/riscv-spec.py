@@ -387,9 +387,9 @@ else:
         directory = "cd /home/gem5/spec/benchspec/CPU/708.sqlite_r/run/run_base_refrate_riscv64.0000;"
         cmd = "./sqlite_r_base.riscv64 < control;"
         
-    elif (args.benchmark == "777.zstd_r" or args.benchmark == "zstd"):
-        directory = "cd /home/gem5/spec/benchspec/CPU/777.zstd_r/run/run_base_refrate_riscv64.0000;"
-        cmd = "./zstd_r_base.riscv64 -b19 -i10 input.tar;"
+    elif (args.benchmark == "816.nab_s"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/816.nab_s/run/run_base_refspeed_riscv64.0000;"
+        cmd = "./nab_s_base.riscv64 --directory 3j1n --seed 20140317 --iterations 220 --epoques 3;" 
         
     elif (args.benchmark == "857.namd_s"):
         directory = "cd /home/gem5/spec/benchspec/CPU/857.namd_s/run/run_base_refspeed_riscv64.0000;"
