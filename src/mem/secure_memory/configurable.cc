@@ -124,7 +124,7 @@ Configurable::startup()
     PmpEntry lower_bound;
     lower_bound.rawAddr = end >> 2; // Shifted for PMP format
     lower_bound.pmpCfg = 0; // PMP_OFF, just acts as a base
-    lower_bound.security = 7; // since PMP_OFF this doesn't matter
+    lower_bound.security = secure; // since PMP_OFF this doesn't matter
     epmpTable.pmpEntries.push_back(lower_bound);
 
     // Create the metadata bounds entry
