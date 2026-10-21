@@ -119,31 +119,22 @@ Configurable::startup()
     }
     printf("src/mem/secure_memory/configurable.cc: ePMP ENTRIES SECURE FLAG SET: %d\n", secure);
 
-    // Align addresses to avoid truncation during shifting
-    Addr aligned_end = end & ~0x3ULL;
-    Addr aligned_level_start = (level_start + 3) & ~0x3ULL;
-
-    // Create lower bound entry for TOR
+    // Include metadata in the ePMP table with an artificial entry
+    // Create a lower bound entry (if needed for TOR, or use existing)
     PmpEntry lower_bound;
-<<<<<<< HEAD
     lower_bound.rawAddr = end >> 2; // Shifted for PMP format
     lower_bound.pmpCfg = 0; // PMP_OFF, just acts as a base
     lower_bound.security = secure; // since PMP_OFF this doesn't matter
-=======
-    lower_bound.rawAddr = aligned_end >> 2; 
-    lower_bound.pmpCfg = 0; // PMP_OFF
-    lower_bound.security = secure; 
->>>>>>> 765cb6facc (bounds check?)
     epmpTable.pmpEntries.push_back(lower_bound);
 
-    // Create metadata bounds entry
+    // Create the metadata bounds entry
     PmpEntry metadata_entry;
-    metadata_entry.rawAddr = aligned_level_start >> 2; 
-    metadata_entry.pmpCfg = (1 << 3); // PMP_TOR (bits 3-4 = 1)
-    metadata_entry.security = secure; // Security flag for metadata
+    metadata_entry.rawAddr = level_start >> 2; // level_start is the top of your metadata
+    // Set A-field to PMP_TOR (value 1). Shift to bits 3-4.
+    metadata_entry.pmpCfg = (1 << 3);
+    metadata_entry.security = 7; // Set to whatever your required metadata security mode is
 
     epmpTable.pmpEntries.push_back(metadata_entry);
-    printf("src/mem/secure_memory/configurable.cc: ePMP METADATA ENTRY SECURE FLAG SET: %d\n", secure);
 
     // Hit rate for deciding when to change security
     metadata_cache_accesses = 0;
@@ -154,7 +145,7 @@ Configurable::startup()
             due to the use of the PMP table primitive.
     */
 }
-
+ 
 Port&
 Configurable::getPort(const std::string &if_name, PortID idx)
 {
