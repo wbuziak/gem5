@@ -383,6 +383,10 @@ else:
         directory = "cd /home/gem5/spec/benchspec/CPU/801.xz_s/run/run_base_refspeed_riscv64.0000;"
         cmd = "./xz_s_base.riscv64 input.combined.xz 250 a2f20b0b0058280d771eb5e2820549151db3f423f034d66f616238e833113333 9369400 9375676 2;" 
 
+    elif (args.benchmark == "782.lbm_r"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/782.lbm_r/run/run_base_test_riscv64.0000;" 
+        cmd = "./lbm_r_base.riscv64 20 reference.dat 0 1 200_200_130_ldc.of;"
+
     elif (args.benchmark == "708.sqlite_r"):
         directory = "cd /home/gem5/spec/benchspec/CPU/708.sqlite_r/run/run_base_refrate_riscv64.0000;"
         cmd = "./sqlite_r_base.riscv64 < control;"

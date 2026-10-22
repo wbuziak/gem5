@@ -1,0 +1,1 @@
+cd /home/gem5/spec;source shrc;cd /home/gem5/spec/benchspec/CPU/782.lbm_r/run/run_base_test_riscv64.0000;./lbm_r_base.riscv64 20 reference.dat 0 1 200_200_130_ldc.of;sleep 5;m5 exit;

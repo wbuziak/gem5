@@ -1,0 +1,1 @@
+cd /home/gem5/spec;source shrc;runcpu --config=riscv64.cfg --action=run --size=ref --noreport -I 782.lbm_r;sleep 5;m5 exit;
