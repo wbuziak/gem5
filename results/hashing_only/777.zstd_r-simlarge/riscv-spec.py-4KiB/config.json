@@ -30,7 +30,7 @@
         "mmap_using_noreserve": false,
         "multi_thread": false,
         "num_work_ids": 16,
-        "readfile": "/home/wbuziak/repos/gem5/results/hashing_only/777.zstd_r-simlarge/riscv-spec.py-4KiB/readfile_-0x19c4334dd51e7b7b",
+        "readfile": "/home/wbuziak/repos/gem5/results/hashing_only/777.zstd_r-simlarge/riscv-spec.py-4KiB/readfile_0x6e071c2f15862cac",
         "redirect_paths": [],
         "shadow_rom_ranges": [],
         "shared_backstore": "",

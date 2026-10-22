@@ -379,25 +379,33 @@ if (args.benchmark == "microbenchmark"):
 
 else:
 # spec CPU 2026 command
-    if (args.benchmark == "782.lbm_r"):
+    if (args.benchmark == "801.xz_s"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/801.xz_s/run/run_base_refspeed_riscv64.0000;"
+        cmd = "./xz_s_base.riscv64 input.combined.xz 250 a2f20b0b0058280d771eb5e2820549151db3f423f034d66f616238e833113333 9369400 9375676 2;" 
+
+    elif (args.benchmark == "782.lbm_r"):
         directory = "cd /home/gem5/spec/benchspec/CPU/782.lbm_r/run/run_base_test_riscv64.0000;" 
-        cmd = "./lbm_r_base.riscv64 20 reference.dat 0 1 200_200_130_ldc.of;" 
+        cmd = "./lbm_r_base.riscv64 20 reference.dat 0 1 200_200_130_ldc.of;"
 
     elif (args.benchmark == "708.sqlite_r"):
         directory = "cd /home/gem5/spec/benchspec/CPU/708.sqlite_r/run/run_base_refrate_riscv64.0000;"
         cmd = "./sqlite_r_base.riscv64 < control;"
         
-    elif (args.benchmark == "777.zstd_r" or args.benchmark == "zstd"):
-        directory = "cd /home/gem5/spec/benchspec/CPU/777.zstd_r/run/run_base_refrate_riscv64.0000;"
-        cmd = "./zstd_r_base.riscv64 -b19 -i10 input.tar;"
+    elif (args.benchmark == "816.nab_s"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/816.nab_s/run/run_base_refspeed_riscv64.0000;"
+        cmd = "./nab_s_base.riscv64 --directory 3j1n --seed 20140317 --iterations 220 --epoques 3;" 
         
     elif (args.benchmark == "857.namd_s"):
         directory = "cd /home/gem5/spec/benchspec/CPU/857.namd_s/run/run_base_refspeed_riscv64.0000;"
         cmd = "./namd_s_base.riscv64 --input namd.input --iterations 38 --output namd.out;"
 
-    elif args.benchmark in ["714.cpython_r", "cpython"]:
+    elif (args.benchmark == "714.cpython_r"):
         directory = "cd /home/gem5/spec/benchspec/CPU/714.cpython_r/run/run_base_refrate_riscv64.0000;"
         cmd = "./cpython_r_base.riscv64 -I -B coreml_pb.py -i 2 -a -m Resnet50Headless.mlmodel -d 10;"
+
+    elif (args.benchmark == "777.zstd_r"):
+        directory = "cd /home/gem5/spec/benchspec/CPU/777.zstd_r/run/run_base_refrate_riscv64.0000;"
+        cmd = "./zstd_base.riscv64 -b19 -e19 -i1 cld.tar;"
 
     command = (
         f"cd /home/gem5/spec;"
@@ -434,6 +442,7 @@ def handle_workbegin():
 
 def handle_workend():
     print()
+    print("==================")
     print("Benchmark finished")
     print("Dump stats at the end of the ROI!")
     m5.stats.dump()

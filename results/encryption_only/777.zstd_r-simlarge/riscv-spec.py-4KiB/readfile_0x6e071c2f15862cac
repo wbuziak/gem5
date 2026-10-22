@@ -1,0 +1,1 @@
+cd /home/gem5/spec;source shrc;cd /home/gem5/spec/benchspec/CPU/777.zstd_r/run/run_base_refrate_riscv64.0000;./zstd_base.riscv64 -b19 -e19 -i1 cld.tar;sleep 5;m5 exit;
