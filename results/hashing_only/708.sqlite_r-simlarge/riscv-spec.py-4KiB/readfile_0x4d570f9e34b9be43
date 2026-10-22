@@ -1,0 +1,1 @@
+cd /home/gem5/spec;source shrc;cd /home/gem5/spec/benchspec/CPU/708.sqlite_r/run/run_base_refrate_riscv64.0000;./sqlite_r_base.riscv64 < control;sleep 5;m5 exit;
