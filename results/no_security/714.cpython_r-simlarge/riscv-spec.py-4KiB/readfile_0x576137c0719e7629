@@ -1,0 +1,1 @@
+cd /home/gem5/spec;source shrc;cd /home/gem5/spec/benchspec/CPU/714.cpython_r/run/run_base_refrate_riscv64.0000;./cpython_r_base.riscv64 -I -B coreml_pb.py -i 2 -a -m Resnet50Headless.mlmodel -d 10;sleep 5;m5 exit;
