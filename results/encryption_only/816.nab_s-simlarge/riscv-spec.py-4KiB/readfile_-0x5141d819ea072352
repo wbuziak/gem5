@@ -1,0 +1,1 @@
+cd /home/gem5/spec;source shrc;cd /home/gem5/spec/benchspec/CPU/816.nab_s/run/run_base_refspeed_riscv64.0000;./nab_s_base.riscv64 --directory 3j1n --seed 20140317 --iterations 220 --epoques 3;sleep 5;m5 exit;
