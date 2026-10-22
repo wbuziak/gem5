@@ -438,6 +438,7 @@ def handle_workbegin():
 
 def handle_workend():
     print()
+    print("==================")
     print("Benchmark finished")
     print("Dump stats at the end of the ROI!")
     m5.stats.dump()

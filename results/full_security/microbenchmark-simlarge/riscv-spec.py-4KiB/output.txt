@@ -1,0 +1,196 @@
+Global frequency set at 1000000000000 ticks per second
+warn: No dot file generated. Please install pydot to generate the dot file and pdf.
+src/mem/dram_interface.cc:690: warn: DRAM device capacity (0 Mbytes) does not match the address range assigned (16384 Mbytes)
+      0: board.platform.rtc: Real-time clock set to Sun Jan  1 00:00:00 2012
+board.platform.terminal: Listening for connections on port 3456
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/base/statistics.hh:279: warn: One of the stats is a legacy stat. Legacy stat is a stat that does not belong to any statistics::Group. Legacy stat is deprecated.
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/mem/coherent_xbar.cc:140: warn: CoherentXBar board.memory.to_mem has no snooping ports attached!
+board.remote_gdb: Listening for connections on port 7000
+src/arch/riscv/linux/fs_workload.cc:162: info: Loaded bootloader '/home/wbuziak/repos/gem5/fs_files/riscv-bootloader-opensbi-1.3.1' at 0x0
+src/arch/riscv/linux/fs_workload.cc:180: info: Loaded kernel '/home/wbuziak/repos/gem5/fs_files/linux-6.5.5' at 0x80200000
+src/arch/riscv/linux/fs_workload.cc:199: info: Loaded DTB '/home/wbuziak/repos/gem5/results/full_security/microbenchmark-simlarge/riscv-spec.py-4KiB/device.dtb' at 0x87e00000
+gem5 Simulator System.  https://www.gem5.org
+gem5 is copyrighted software; use the --copyright option for details.
+
+gem5 version 24.1.0.2
+gem5 compiled Oct 20 2026 03:17:52
+gem5 started Oct 20 2026 06:29:37
+gem5 executing on iris-arm-server-2, pid 1760254
+command line: /home/wbuziak/repos/gem5/build/RISCV/gem5.opt -d /home/wbuziak/repos/gem5/results/full_security/microbenchmark-simlarge/riscv-spec.py-4KiB /home/wbuziak/repos/gem5/configs/example/gem5_library/riscv-spec.py --benchmark microbenchmark --size simlarge --metadata_cache_size 4KiB --memory full_security --l3_size 256KiB --mcx_policy never
+
+
+Running memory module: full_security
+  secure_flag: 7
+
+
+Running the simulation
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 0 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 1 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 2 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 3 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 4 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 5 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 6 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 7 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 8 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 9 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 10 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 11 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 12 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 13 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 14 SECURE FLAG SET: 7
+src/mem/secure_memory/configurable.cc:119 ePMP ENTRY 15 SECURE FLAG SET: 7
+src/sim/simulate.cc:199: info: Entering event queue @ 0.  Starting simulation...
+src/arch/riscv/isa.cc:655: warn: Ignoring write to miscreg HPMCOUNTER03.
+src/arch/riscv/isa.cc:655: warn: Ignoring write to miscreg HPMCOUNTER03.
+src/arch/riscv/isa.cc:655: warn: Ignoring write to miscreg HPMCOUNTER03.
+src/arch/riscv/isa.cc:655: warn: Ignoring write to miscreg HPMCOUNTER03.
+src/arch/riscv/isa.cc:655: warn: Ignoring write to miscreg HPMCOUNTER03.
+src/arch/riscv/isa.cc:655: warn: Ignoring write to miscreg HPMCOUNTER03.
+src/arch/riscv/isa.cc:655: warn: Ignoring write to miscreg HPMCOUNTER03.
+src/arch/riscv/isa.cc:655: warn: Ignoring write to miscreg HPMCOUNTER03.
+src/dev/riscv/vio_mmio.cc:216: warn: Ignoring queue resize hint. Requested size: 16
+src/arch/riscv/isa.cc:974: warn: 301126266639: context 0: 10000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 319372412895: context 0: 20000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 337616677368: context 0: 30000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 355862535579: context 0: 40000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 374101484040: context 0: 50000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 392357795454: context 0: 60000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 410607185463: context 0: 70000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 428842552842: context 0: 80000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 447094037421: context 0: 90000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 465341741784: context 0: 100000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 483578590347: context 0: 110000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 501829014987: context 0: 120000 consecutive SC failures.
+src/arch/riscv/isa.cc:974: warn: 520075930473: context 0: 130000 consecutive SC failures.
+src/sim/power_state.cc:105: warn: PowerState: Already in the requested power state, request ignored
+Done booting Linux
+Resetting stats at the start of ROI!
+switching cpus
+src/sim/simulate.cc:199: info: Entering event queue @ 523972253916.  Starting simulation...
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539880 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539bc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008200 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008200 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff8056b200 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80531880 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539800 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539bc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539800 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539bc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539800 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539bc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539cc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539cc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003300 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff8007e400 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80053d80 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80053f80 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539cc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80535580 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539ac0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539cc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a9dc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff8051e700 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539ac0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539cc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539a80 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539a80 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539800 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539bc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80062340 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80457240 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003380 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0x3fa93a18c0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/arch/riscv/isa.cc:974: warn: 586708285086: context 0: 10000 consecutive SC failures.
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1680 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1540 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80457380 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80066d80 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80003640 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff808a1f40 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539800 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80539bc0 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+src/cpu/o3/fetch.cc:603: warn: Address 0xffffffff80008840 is outside of physical memory, stopping fetch
+
+Maximum instructions reached
+Dump stats at the end of the ROI!
+
+All simulation events were successful.
+
+Performance statistics:
+Simulated time in ROI: N/A (Simulation exited before ROI completed)
