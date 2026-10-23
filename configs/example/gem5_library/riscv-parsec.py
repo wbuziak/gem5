@@ -51,6 +51,7 @@ import argparse
 import sys
 import time
 import os
+import base64
 
 import m5
 from m5.objects import Root
@@ -79,6 +80,7 @@ from gem5.isas import ISA
 from gem5.simulate.exit_event import ExitEvent
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
+from socket import gethostname
 
 
 benchmark_choices = [
@@ -134,6 +136,22 @@ parser.add_argument(
     type=str,
     required=True,
     help="Input the memory module to run.",
+    choices=memory_choices,
+)
+
+parser.add_argument(
+    "--benchmark2",
+    type=str,
+    required=False,
+    help="2nd benchmark",
+    choices=benchmark_choices,
+)
+
+parser.add_argument(
+    "--memory2",
+    type=str,
+    required=False,
+    help="Which security protocol for 2nd benchmark.",
     choices=memory_choices,
 )
 
@@ -346,29 +364,82 @@ if (args.benchmark == "microbenchmark"):
     #  m5 exit
     #""" # background process w/ '&' operator
 else:
-# parsec command
-    command = (
-        f"cd /home/gem5/parsec-benchmark;"
-        + "source env.sh;"
-        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size}         -n 4;"
-        + "sleep 5;"
-        + "m5 exit;"
-    )
+    bmarks = [args.benchmark]
+    if args.benchmark2:
+        bmarks.append(args.benchmark2)
 
-board.set_kernel_disk_workload(
-    bootloader=BootloaderResource(
-        local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"
-    ),
-    kernel=KernelResource(
-        local_path=os.getcwd() + "/fs_files/linux-6.5.5"
-    ),
-    # The x86-parsec image will be automatically downloaded to the
-    # `~/.cache/gem5` directory if not already present.
-    disk_image=DiskImageResource(
-        local_path=os.getcwd() + "/fs_files/riscv-ubuntu-22.04"
-    ),
-    readfile_contents=command,
-)
+    payloads = {}
+    guest_args_map = {}
+    
+    hostname = gethostname()
+    PARSEC_DIR = "/home/wbuziak/repos/gem5/parsec-benchmark"
+    
+    for bm in bmarks:
+        # 1. Locate the binary
+        if hostname == "iris-arm-server-3":
+            app_path = os.path.join(PARSEC_DIR, "pkgs", "apps", bm, "inst", "aarch64-linux.riscv-hooks", "bin", bm)
+            kernel_path = os.path.join(PARSEC_DIR, "pkgs", "kernels", bm, "inst", "aarch64-linux.riscv-hooks", "bin", bm)
+            
+            if os.path.isfile(app_path):
+                WORKLOAD_PATH = app_path
+            elif os.path.isfile(kernel_path):
+                WORKLOAD_PATH = kernel_path
+            else:
+                WORKLOAD_PATH = "" 
+        else:
+            WORKLOAD_PATH = os.path.join(PARSEC_DIR, bm)
+
+        if not os.path.isfile(WORKLOAD_PATH):
+            print(f"Host binary not found for {bm}: {WORKLOAD_PATH}")
+            sys.exit(1)
+
+        # 2. Base64 Encode
+        with open(WORKLOAD_PATH, "rb") as f:
+            payloads[bm] = base64.b64encode(f.read()).decode("ascii")
+
+        # 3. Setup arguments (Blackscholes example)
+        if bm == "blackscholes":
+            input_map = {"simsmall": "in_4K.txt", "simmedium": "in_16K.txt", "simlarge": "in_64K.txt"}
+            input_file = input_map.get(args.size, "in_4K.txt")
+            guest_args_map[bm] = f"4 {input_file} prices.txt"
+        else:
+            guest_args_map[bm] = "4" # Fallback
+
+    # 4. Construct Guest Execution Command
+    command = "echo 'Boot complete, updating binaries!'\n"
+    
+    # Unpack both binaries
+    for i, bm in enumerate(bmarks):
+        command += (
+            f"cat << 'B64EOF{i}' | base64 -d > /root/exec_{bm}\n"
+            f"{payloads[bm]}\n"
+            f"B64EOF{i}\n"
+            f"chmod +x /root/exec_{bm}\n"
+        )
+
+    # Launch both benchmarks in the background
+    for i, bm in enumerate(bmarks):
+        command += (
+            f"mkdir -p /root/run_{bm}\n"
+            f"cd /root/run_{bm}\n"
+            # Assuming it's an app; adjust if using kernels
+            f"tar -xf {PARSEC_DIR}/pkgs/apps/{bm}/inputs/input_{args.size}.tar\n"
+            f"/root/exec_{bm} {guest_args_map[bm]} &\n"
+            f"PID{i}=$!\n"
+        )
+    
+    # Wait for both to finish
+    for i in range(len(bmarks)):
+        command += f"wait $PID{i}\n"
+        
+    command += "echo 'All benchmarks exited'\nm5 exit\n"
+
+    board.set_kernel_disk_workload(
+        bootloader=BootloaderResource(local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"),
+        kernel=KernelResource(local_path=os.getcwd() + "/fs_files/linux-6.5.5"),
+        disk_image=DiskImageResource(local_path=os.getcwd() + "/fs_files/riscv-ubuntu-22.04"),
+        readfile_contents=command,
+    ) 
 
 # functions to handle different exit events during the simuation
 def handle_workbegin():
