@@ -370,45 +370,58 @@ else:
 
     payloads = {}
     guest_args_map = {}
-    
+    bm_types = {} # Track whether the benchmark is an app or a kernel
+
     hostname = gethostname()
     PARSEC_DIR = "/home/wbuziak/repos/gem5/parsec-benchmark"
-    
+
     for bm in bmarks:
         # 1. Locate the binary
-        if hostname == "iris-arm-server-3":
-            app_path = os.path.join(PARSEC_DIR, "pkgs", "apps", bm, "inst", "aarch64-linux.riscv-hooks", "bin", bm)
-            kernel_path = os.path.join(PARSEC_DIR, "pkgs", "kernels", bm, "inst", "aarch64-linux.riscv-hooks", "bin", bm)
-            
-            if os.path.isfile(app_path):
-                WORKLOAD_PATH = app_path
-            elif os.path.isfile(kernel_path):
-                WORKLOAD_PATH = kernel_path
-            else:
-                WORKLOAD_PATH = "" 
-        else:
-            WORKLOAD_PATH = os.path.join(PARSEC_DIR, bm)
+        app_path = os.path.join(PARSEC_DIR, "pkgs", "apps", bm, "inst", "aarch64-linux.riscv-hooks", "bin", bm)
+        kernel_path = os.path.join(PARSEC_DIR, "pkgs", "kernels", bm, "inst", "aarch64-linux.riscv-hooks", "bin", bm)
 
-        if not os.path.isfile(WORKLOAD_PATH):
-            print(f"Host binary not found for {bm}: {WORKLOAD_PATH}")
+        # Check both apps and kernels directories
+        if os.path.isfile(app_path):
+            WORKLOAD_PATH = app_path
+            bm_types[bm] = "apps"
+        elif os.path.isfile(kernel_path):
+            WORKLOAD_PATH = kernel_path
+            bm_types[bm] = "kernels"
+        else:
+            print(f"Host binary not found for {bm}. Checked apps and kernels.")
             sys.exit(1)
 
         # 2. Base64 Encode
         with open(WORKLOAD_PATH, "rb") as f:
             payloads[bm] = base64.b64encode(f.read()).decode("ascii")
 
-        # 3. Setup arguments (Blackscholes example)
+        # 3. Setup arguments based on workload and size
         if bm == "blackscholes":
             input_map = {"simsmall": "in_4K.txt", "simmedium": "in_16K.txt", "simlarge": "in_64K.txt"}
             input_file = input_map.get(args.size, "in_4K.txt")
             guest_args_map[bm] = f"4 {input_file} prices.txt"
+
+        elif bm == "streamcluster":
+            # args: k1 k2 d dim chunksize clustersize infile outfile nthreads
+            input_map = {
+                "simsmall": "10 20 32 4096 4096 1000 none output.txt 4",
+                "simmedium": "10 20 64 8192 8192 1000 none output.txt 4",
+                "simlarge": "10 20 128 16384 16384 1000 none output.txt 4"
+            }
+            guest_args_map[bm] = input_map.get(args.size, "10 20 32 4096 4096 1000 none output.txt 4")
+
+        elif bm == "dedup":
+            # args: -c (compress) -p (profiling) -v (verbose) -t <threads> -i <infile> -o <outfile>
+            # PARSEC's input_*.tar extracts 'media.dat' for all sizes; only the file size changes.
+            guest_args_map[bm] = "-c -p -v -t 4 -i media.dat -o output.dat.ddp"
+
         else:
             guest_args_map[bm] = "4" # Fallback
 
     # 4. Construct Guest Execution Command
     command = "echo 'Boot complete, updating binaries!'\n"
-    
-    # Unpack both binaries
+
+    # Unpack both binaries via Base64 decoding
     for i, bm in enumerate(bmarks):
         command += (
             f"cat << 'B64EOF{i}' | base64 -d > /root/exec_{bm}\n"
@@ -419,27 +432,28 @@ else:
 
     # Launch both benchmarks in the background
     for i, bm in enumerate(bmarks):
+        bm_type = bm_types[bm] # Dynamically grab "apps" or "kernels"
         command += (
             f"mkdir -p /root/run_{bm}\n"
             f"cd /root/run_{bm}\n"
-            # Assuming it's an app; adjust if using kernels
-            f"tar -xf {PARSEC_DIR}/pkgs/apps/{bm}/inputs/input_{args.size}.tar\n"
+            # Note: This assumes /home/wbuziak/... is mounted in your guest OS via m5 virtio 9p.
+            f"tar -xf {PARSEC_DIR}/pkgs/{bm_type}/{bm}/inputs/input_{args.size}.tar\n"
             f"/root/exec_{bm} {guest_args_map[bm]} &\n"
             f"PID{i}=$!\n"
         )
-    
+
     # Wait for both to finish
     for i in range(len(bmarks)):
         command += f"wait $PID{i}\n"
-        
-    command += "echo 'All benchmarks exited'\nm5 exit\n"
 
-    board.set_kernel_disk_workload(
-        bootloader=BootloaderResource(local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"),
-        kernel=KernelResource(local_path=os.getcwd() + "/fs_files/linux-6.5.5"),
-        disk_image=DiskImageResource(local_path=os.getcwd() + "/fs_files/riscv-ubuntu-22.04"),
-        readfile_contents=command,
-    ) 
+command += "echo 'All benchmarks exited'\nm5 exit\n"
+
+board.set_kernel_disk_workload(
+    bootloader=BootloaderResource(local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"),
+    kernel=KernelResource(local_path=os.getcwd() + "/fs_files/linux-6.5.5"),
+    disk_image=DiskImageResource(local_path=os.getcwd() + "/fs_files/riscv-ubuntu-22.04"),
+    readfile_contents=command,
+) 
 
 # functions to handle different exit events during the simuation
 def handle_workbegin():
