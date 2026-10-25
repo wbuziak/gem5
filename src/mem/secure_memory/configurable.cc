@@ -308,15 +308,6 @@ Configurable::handleRequest(PacketPtr pkt)
         return false;
     }
 
-    // BOUNDS CHECK: Prevent speculative out-of-bounds fetches from crashing calculations
-    AddrRangeList ranges = mem_port.getAddrRanges();
-    if (!ranges.front().contains(pkt->getAddr())) {
-        // Address is invalid/out-of-bounds. Forward to memory to let the standard 
-        // system handle the fault/NACK, and skip all security processing.
-        mem_port.sendPacket(pkt);
-        return true; 
-    }
-
     // create request for associated metadata
     Addr counter_addr = calculateCounterAddress(pkt->getAddr());
     RequestPtr req = std::make_shared<Request>(counter_addr, BLOCK_SIZE, 0, 0);
