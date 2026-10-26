@@ -64,7 +64,6 @@ Configurable::Configurable(const ConfigurableParams *p)
      use_metadata_cache(p->cache),
      cache_mac(p->cache_mac),
      eager_fetch(p->eager_fetch),
-     secure(p->secure),
      bonsai(p->bonsai),
      cipherEvent([this] { cipherEngine(); }, name()),
      macEvent([this] { macEngine(); }, name()),
@@ -79,6 +78,7 @@ Configurable::startup()
 {
     //assert(mem_port.getAddrRanges().size() == 1);
 
+    int i, index;
     Addr start = mem_port.getAddrRanges().front().start();
     Addr end = mem_port.getAddrRanges().back().end();
 
@@ -112,19 +112,29 @@ Configurable::startup()
     epmpTable.mode = integrity_levels.size(); 
 
     // Set security mode manually
-    int i;
 
     for (i = 0; i < epmpTable.pmpEntries.size(); i++) {
-        epmpTable.pmpEntries[i].security = secure; // set to security flag
+        index = i % 6;
+        if (index == 5) index = 7; 
+          /*
+            index = 0: no security          000
+            index = 1: hashing only         001
+            index = 2: encryption only      010
+            index = 3: hashing + encryption 011
+            index = 4: integrity checks     100
+            index = 7: full security        111
+          */
+        epmpTable.pmpEntries[i].security = index; // set security flag
+        epmpTable.pmpEntries[i].asid = 1; // Set ASID for benchmark 1
     }
-    printf("src/mem/secure_memory/configurable.cc: ePMP ENTRIES SECURE FLAG SET: %d\n", secure);
 
     // Include metadata in the ePMP table with an artificial entry
     // Create a lower bound entry (if needed for TOR, or use existing)
     PmpEntry lower_bound;
     lower_bound.rawAddr = end >> 2; // Shifted for PMP format
     lower_bound.pmpCfg = 0; // PMP_OFF, just acts as a base
-    lower_bound.security = secure; // since PMP_OFF this doesn't matter
+    lower_bound.security = 0; // since PMP_OFF this doesn't matter
+    lower_bound.asid = 0;
     epmpTable.pmpEntries.push_back(lower_bound);
 
     // Create the metadata bounds entry
@@ -133,8 +143,18 @@ Configurable::startup()
     // Set A-field to PMP_TOR (value 1). Shift to bits 3-4.
     metadata_entry.pmpCfg = (1 << 3);
     metadata_entry.security = 7; // Set to whatever your required metadata security mode is
+    metadata_entry.asid = 0; // we set this to zero because we don't know the benchmark ASID
 
     epmpTable.pmpEntries.push_back(metadata_entry);
+
+    // Prepopulate metadata pages directly into the page map
+    // Assuming 'level_start' and 'end' define your physical metadata region
+    Addr meta_start_pfn = level_start >> 12; // Convert address to 4KiB page frame
+    Addr meta_end_pfn = end >> 12;
+
+    for (Addr pfn = meta_start_pfn; pfn <= meta_end_pfn; pfn++) {
+        page_security_map[pfn] = 7; // Set to full metadata security mode
+    }
 
     // Hit rate for deciding when to change security
     metadata_cache_accesses = 0;
@@ -312,14 +332,20 @@ Configurable::handleRequest(PacketPtr pkt)
     Addr counter_addr = calculateCounterAddress(pkt->getAddr());
     RequestPtr req = std::make_shared<Request>(counter_addr, BLOCK_SIZE, 0, 0);
     PacketPtr counter_pkt = Packet::createRead(req);
+    if (pkt->req->hasContextId()) {
+        req->setContext(pkt->req->contextId());
+    }
+
+    // Inherit the RISC-V SATP Context (ASID) for benchmark tagging
+    req->setSatpContext(pkt->req->getSatpContext());
 
     //printf("src/mem/secure_memory/configurable.cc: ASID: %lx\n", req->getSatpContext());
 
     if (pkt->isWrite()) {
-        if (ePMPSecurity(req->getPaddr(), req->getSize()) & (1 << 1)) {
+        if (evaluatePmpEntries(req) & (1 << 1)) {
           // Encryption is enabled, fetch counter
           awaiting_counter.emplace(pkt);
-        } else if (ePMPSecurity(req->getPaddr(), req->getSize()) & 1) {
+        } else if (evaluatePmpEntries(req) & 1) {
           // Hashing is enabled, but encryption is not. Route to MAC queue.
           // We don't want to wait on the counter
           initiateMac(pkt);
@@ -347,7 +373,7 @@ Configurable::handleRequest(PacketPtr pkt)
 
             // request the mac as well
             // Only if hashing flag is set
-            if (secure & 1 || ePMPSecurity(req->getPaddr(), req->getSize()) & 1) {
+            if (evaluatePmpEntries(req) & 1) {
               Addr mac_addr = calculateMacAddress(pkt->getAddr());
               RequestPtr req = std::make_shared<Request>(
                   mac_addr, BLOCK_SIZE, 0, 0
@@ -381,7 +407,7 @@ Configurable::handleRequest(PacketPtr pkt)
 
     // send counter request to memory
     // Only when we want to do encryption
-    if (ePMPSecurity(req->getPaddr(), req->getSize()) & (1 << 1)) {
+    if (evaluatePmpEntries(req) & (1 << 1)) {
       counter_pkt->allocate();
       if (use_metadata_cache) {
           metadata_request_port.sendPacket(counter_pkt);
@@ -403,9 +429,9 @@ Configurable::handleMetadataCacheMiss(PacketPtr pkt)
     assert(pkt->isRead());
     assert(isMetadata(pkt->getAddr()));
     assert(!isMac(pkt->getAddr()) || cache_mac);
-    assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) > 0);
+    assert(evaluatePmpEntries(pkt) > 0);
 
-    if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1] && ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
+    if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1] && evaluatePmpEntries(pkt) & 1) {
         // this is a tree node, we need to track the miss
         if ((!isMac(pkt->getAddr()) && !isCounter(pkt->getAddr())) ||
             (bonsai && isCounter(pkt->getAddr())) ||
@@ -443,7 +469,7 @@ Configurable::handleResponse(PacketPtr pkt)
     if (pkt->isRead() && !parallelReadAndWrite(pkt)) {
         
         // Wait for Counters ONLY if encryption is enabled
-        if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
+        if (evaluatePmpEntries(pkt) & (1 << 1)) {
             auto ctr_found = counter_fetched.find(pkt->getAddr());
             if (ctr_found != counter_fetched.end()) {
                 // we are all set to start the decryption procedure
@@ -467,7 +493,7 @@ Configurable::handleResponse(PacketPtr pkt)
         }
 
         // Wait for MACs ONLY if hashing is enabled
-        if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
+        if (evaluatePmpEntries(pkt) & 1) {
             auto mac_found = mac_fetched.find(pkt->getAddr());
             if (mac_found != mac_fetched.end()) {
                 // we are all set to start the authentication procedure
@@ -491,7 +517,7 @@ Configurable::handleResponse(PacketPtr pkt)
         }
         
         // If no security is enabled, send straight to CPU
-        if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) == 0) {
+        if (evaluatePmpEntries(pkt) == 0) {
             cpu_port.sendPacket(pkt);
         }
 
@@ -527,7 +553,7 @@ Configurable::processCounterResponse(PacketPtr pkt)
 bool
 Configurable::handleCounterResponse(PacketPtr pkt)
 {
-    assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
+    assert(evaluatePmpEntries(pkt) & (1 << 1));
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -556,7 +582,7 @@ Configurable::handleCounterResponse(PacketPtr pkt)
                 // not sure who will trigger retry event if this fails
                 assert((*it)->isRequest());
                 // Only call initiateMac if doing hashing
-                if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
+                if (evaluatePmpEntries(pkt) & 1) {
                     if (!initiateMac(*it)) {
                         pending_mac.push_back(*it);
                     }
@@ -580,7 +606,7 @@ Configurable::handleCounterResponse(PacketPtr pkt)
 bool
 Configurable::handleTreeResponse(PacketPtr pkt)
 {
-    assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2));
+    assert(evaluatePmpEntries(pkt) & (1 << 2));
     if (needs_authentication.find(pkt->getAddr()) !=
         needs_authentication.end())
     {
@@ -593,7 +619,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
         {
             if (parent_addr == (*it)->getAddr()) {
                 assert(!authenticated);
-                if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
+                if (evaluatePmpEntries(pkt) & 1) {
                   // Only go through mac process if hashing
                   // We will just assume authenticated otherwise
                   initiateMac(pkt);
@@ -658,7 +684,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
             if (calculateParentAddress((*it)->getAddr()) == pkt->getAddr()) {
                 // authenticate the child node
                 assert((*it)->isWrite() || (*it)->isResponse());
-                if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
+                if (evaluatePmpEntries(pkt) & 1) {
                   // Only go through mac process if hashing
                   // We will just authenticate otherwise
                   initiateMac(*it);
@@ -688,11 +714,11 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 
         if (isCounter(pkt->getAddr())) {
             assert(bonsai);
-            assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
+            assert(evaluatePmpEntries(pkt) & (1 << 1));
             assert(handleCounterResponse(pkt));
         } else if (isMac(pkt->getAddr())) {
             assert(!bonsai);
-            assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1);
+            assert(evaluatePmpEntries(pkt) & 1);
             assert(handleMacResponse(pkt));
         } else {
             if (pkt->isRead() && !child_authenticated) {
@@ -709,7 +735,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 bool
 Configurable::handleMacResponse(PacketPtr pkt)
 {
-    assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1);
+    assert(evaluatePmpEntries(pkt) & 1);
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -750,7 +776,7 @@ Configurable::handleMacResponse(PacketPtr pkt)
 bool
 Configurable::initiateCipher(PacketPtr pkt)
 {
-    assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
+    assert(evaluatePmpEntries(pkt) & (1 << 1));
     // need to decrypt the data prior to sending to processor
     if (cipher_queue.size() == max_cipher_size) {
         return false;
@@ -795,7 +821,7 @@ Configurable::initiateCipher(PacketPtr pkt)
 bool
 Configurable::initiateMac(PacketPtr pkt)
 {
-    assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1);
+    assert(evaluatePmpEntries(pkt) & 1);
     // need to decrypt the data prior to sending to processor
     if (hashing_queue.size() == max_mac_size) {
         return false;
@@ -831,7 +857,7 @@ Configurable::updateTree(PacketPtr pkt)
     mem_port.sendPacket(pkt);
 
     // Update Counter (Only if doing Encryption)
-    if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
+    if (evaluatePmpEntries(pkt) & (1 << 1)) {
         Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
         RequestPtr ctr_req = std::make_shared<Request>(ctr_addr, BLOCK_SIZE, 0, 0);
         PacketPtr counter_pkt = Packet::createWrite(ctr_req);
@@ -845,7 +871,7 @@ Configurable::updateTree(PacketPtr pkt)
     }
 
     // Update Tree (Only if doing integrity checks)
-    if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2)) {
+    if (evaluatePmpEntries(pkt) & (1 << 2)) {
         Addr ctr_addr = calculateCounterAddress(pkt->getAddr());
         Addr mac_addr = calculateMacAddress(pkt->getAddr());
         Addr addr = bonsai ? ctr_addr : mac_addr;
@@ -865,7 +891,7 @@ Configurable::updateTree(PacketPtr pkt)
     }
 
     // Update MAC (Only if Hashing is enabled)
-    if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
+    if (evaluatePmpEntries(pkt) & 1) {
         Addr mac_addr = calculateMacAddress(pkt->getAddr());
         RequestPtr mac_req = std::make_shared<Request>(mac_addr, BLOCK_SIZE, 0, 0);
         PacketPtr mac_pkt = Packet::createWrite(mac_req);
@@ -890,18 +916,18 @@ Configurable::cipherEngine()
         cipher_queue.front().second < xor_queue.front().second))
     {
         pkt = cipher_queue.front().first;
-        assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
+        assert(evaluatePmpEntries(pkt) & (1 << 1));
         cipher_queue.pop_front();
     } else {
         assert(!xor_queue.empty());
         pkt = xor_queue.front().first;
-        assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1));
+        assert(evaluatePmpEntries(pkt) & (1 << 1));
         xor_queue.pop_front();
     }
 
 
     if (isCounter(pkt->getAddr())) {
-        if (bonsai && (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2))) {
+        if (bonsai && (evaluatePmpEntries(pkt) & (1 << 2))) {
             // Only when integrity checking
             handleTreeResponse(pkt); // checks if data is trusted first
         } else {
@@ -910,7 +936,7 @@ Configurable::cipherEngine()
         }
    } else {
         // Are we ALSO doing hashing? If so, we must rendezvous.
-        if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
+        if (evaluatePmpEntries(pkt) & 1) {
             auto mac_it = std::find(hashed_packets.begin(),
                                     hashed_packets.end(), pkt);
             if (mac_it != hashed_packets.end()) {
@@ -968,14 +994,14 @@ Configurable::macEngine()
     assert(!hashing_queue.empty());
 
     PacketPtr pkt = hashing_queue.front().first;
-    assert(ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1);
+    assert(evaluatePmpEntries(pkt) & 1);
     hashing_queue.pop_front();
 
     if (isMetadata(pkt->getAddr())) {
         handleTreeResponse(pkt);
     } else {
         // Are we ALSO doing encryption? If so, we must rendezvous.
-        if (ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
+        if (evaluatePmpEntries(pkt) & (1 << 1)) {
             auto cipher_it = std::find(ciphered_packets.begin(),
                                        ciphered_packets.end(), pkt);
             if (cipher_it != ciphered_packets.end()) {
@@ -1187,14 +1213,14 @@ Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
         bool is_metadata = parent->isMetadata(pkt->getAddr());
         bool is_mac = parent->isMac(pkt->getAddr());
 
-        if (parent->ePMPSecurity(pkt->getAddr(), pkt->getSize())) {
+        if (parent->evaluatePmpEntries(pkt)) {
           // integrity checking or encryption
           if (is_metadata && !is_mac) {
               // this is a tree node
               assert(!is_mac);
               if (parent->use_metadata_cache) {
                   parent->metadata_response_port.sendPacket(pkt);
-              } else if (parent->bonsai && parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2)) {
+              } else if (parent->bonsai && parent->evaluatePmpEntries(pkt) & (1 << 2)) {
                   // Only call this if secure flag is set
                   // to do integrity checking
                   assert(parent->handleTreeResponse(pkt));
@@ -1208,7 +1234,7 @@ Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
               assert(is_mac);
               if (parent->cache_mac) {
                   parent->metadata_response_port.sendPacket(pkt);
-              } else if (!parent->bonsai && parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2)) {
+              } else if (!parent->bonsai && parent->evaluatePmpEntries(pkt) & (1 << 2)) {
                   // We only want to handle tree responses when
                   // doing integrity checking
                   assert(parent->handleTreeResponse(pkt));
@@ -1267,16 +1293,16 @@ Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
 
     // Otherwise, route read responses based on address and enabled features
     if (parent->isMac(pkt->getAddr())) {
-        if (parent->bonsai && parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & 1) {
+        if (parent->bonsai && parent->evaluatePmpEntries(pkt) & 1) {
             return parent->handleMacResponse(pkt);
         } else {
-            assert(parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2));
+            assert(parent->evaluatePmpEntries(pkt) & (1 << 2));
             return parent->handleTreeResponse(pkt);
         }
-    } else if (parent->isCounter(pkt->getAddr()) && parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 1)) {
+    } else if (parent->isCounter(pkt->getAddr()) && parent->evaluatePmpEntries(pkt) & (1 << 1)) {
         return parent->processCounterResponse(pkt);
     } else {
-        assert(parent->ePMPSecurity(pkt->getAddr(), pkt->getSize()) & (1 << 2));
+        assert(parent->evaluatePmpEntries(pkt) & (1 << 2));
         return parent->handleTreeResponse(pkt);
     }
 }
@@ -1382,41 +1408,108 @@ Configurable::pmpDecodeNapot(Addr pmpaddr)
 }
 
 int
-Configurable::ePMPSecurity(const Addr &paddr, unsigned int size)
+Configurable::evaluatePmpEntries(RequestPtr req)
 {
+    Addr paddr = req->getPaddr();
+    Addr page_pfn = paddr >> 12; // 4KiB page size shift
+    unsigned int size = req->getSize();
+    uint64_t asid = req->getSatpContext();
+    Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
+
+    // Check Physical Page Map (Catches evictions and known pages)
+    auto page_it = page_security_map.find(page_pfn);
+    if (page_it != page_security_map.end()) {
+        return page_it->second;
+    }
+
+    // Perform strictly hardware-based PMP table lookup
+    int sec_mode = 0;
+    for (int i = 0; i < epmpTable.pmpEntries.size(); i++) {
+        uint8_t cfg = epmpTable.pmpEntries[i].pmpCfg;
+        uint8_t a_field = pmpGetAField(cfg);
+
+        if (a_field == PMP_OFF) continue;
+
+        AddrRange pmp_range(0, 0);
+        Addr raw_addr = epmpTable.pmpEntries[i].rawAddr;
+
+        // Compute physical bounds using (i - 1) strictly for TOR
+        if (a_field == PMP_TOR) {
+            Addr lower = (i > 0) ? (epmpTable.pmpEntries[i - 1].rawAddr << 2) : 0;
+            Addr upper = raw_addr << 2;
+            pmp_range = AddrRange(lower, upper);
+        } else if (a_field == PMP_NA4) {
+            Addr base = raw_addr << 2;
+            pmp_range = AddrRange(base, base + 4);
+        } else if (a_field == PMP_NAPOT) {
+            pmp_range = pmpDecodeNapot(raw_addr);
+        }
+
+        // Check if physical address and context match the entry
+        if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
+            // Match global entries (ASID == 0) or specific process ASIDs
+            if (epmpTable.pmpEntries[i].asid == 0 || epmpTable.pmpEntries[i].asid == asid) {
+                sec_mode = epmpTable.pmpEntries[i].security;
+                break; // Stop at first matching priority entry
+            }
+        }
+    }
+
+    // Cache the result for future accesses and cache writebacks
+    if (sec_mode != 0) {
+        page_security_map[page_pfn] = sec_mode;
+    }
+
+    printf("ePMP match with asid %lu - security mode: %d\n", asid, sec_mode);
+
+    return sec_mode;
+}
+
+int
+Configurable::evaluatePmpEntries(PacketPtr pkt)
+{
+    // A PacketPtr always contains a RequestPtr in gem5
+    assert(pkt->req);
+    return evaluatePmpEntries(pkt->req);
+}
+
+int
+Configurable::ePMPSecurity(RequestPtr req)
+{
+    Addr paddr = req->getPaddr();
+    unsigned int size = req->getSize();
+    uint64_t pkt_asid = req->getSatpContext();
     Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
 
     for (int i = 0; i < epmpTable.pmpEntries.size(); i++) {
         uint8_t cfg = epmpTable.pmpEntries[i].pmpCfg;
         uint8_t a_field = pmpGetAField(cfg);
 
-        // Do not skip PMP_OFF if it serves as a TOR lower bound for the next entry
         if (a_field == PMP_OFF) {
             continue;
         }
 
+        // Compute physical range for TOR
         AddrRange pmp_range(0, 0);
         Addr raw_addr = epmpTable.pmpEntries[i].rawAddr;
 
         if (a_field == PMP_TOR) {
-            // Retrieve lower bound directly from previous rawAddr without checking its a_field
-            Addr lower = 0;
-            if (i > 0) {
-                lower = epmpTable.pmpEntries[i - 1].rawAddr << 2;
-            }
+            Addr lower = (i > 0) ? (epmpTable.pmpEntries[i - 1].rawAddr << 2) : 0;
             Addr upper = raw_addr << 2;
             pmp_range = AddrRange(lower, upper);
-
         } else if (a_field == PMP_NA4) {
             Addr base = raw_addr << 2;
             pmp_range = AddrRange(base, base + 4);
-
         } else if (a_field == PMP_NAPOT) {
             pmp_range = pmpDecodeNapot(raw_addr);
         }
 
+        // Check physical address match 
         if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
-            return epmpTable.pmpEntries[i].security;
+            // Global metadata/system entries (asid == 0) always match
+            if (epmpTable.pmpEntries[i].asid == 0 || epmpTable.pmpEntries[i].asid == pkt_asid) {
+                return epmpTable.pmpEntries[i].security;
+            }
         }
     }
 

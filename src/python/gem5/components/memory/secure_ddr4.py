@@ -144,7 +144,6 @@ class SecureDDR4(AbstractMemorySystem):
                     cache_mac=ch,
                     eager_fetch=ef,
                     bonsai=bonsai,
-                    secure=secure,
                 )
             elif secure_memory_class == MCX:
                 self.secure_memory = MCX(
@@ -310,7 +309,6 @@ def ConfigurableMemory(
     cache_mac: Optional[bool] = False,
     eager_fetch: Optional[bool] = True,
     bonsai: Optional[bool] = True,
-    secure: Optional[int] = 7, # security parameter
 ) -> AbstractMemorySystem:
     # arity describes counter arity (number of data blocks per counter block)
     return SecureDDR4(
@@ -323,7 +321,6 @@ def ConfigurableMemory(
         ch=cache_mac,
         ef=eager_fetch,
         bonsai=bonsai,
-        secure=secure,
     )
 
 def MCXSecureMemory(

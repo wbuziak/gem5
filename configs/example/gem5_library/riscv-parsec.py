@@ -104,11 +104,7 @@ benchmark_choices = [
 
 memory_choices = [
     "configurable", # configurability based on ePMP security
-    "hashing_only",
-    "encryption_only",
-    "hashing+encryption",
-    "full_security", # should be identical to integrity_tree
-    "no_security",
+    "integrity_tree",
     "mcx",
     "DDR4", # Regular DDR4 module from gem5
 ]
@@ -132,19 +128,35 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--memory",
-    type=str,
-    required=True,
-    help="Input the memory module to run.",
-    choices=memory_choices,
-)
-
-parser.add_argument(
     "--benchmark2",
     type=str,
     required=False,
     help="2nd benchmark",
     choices=benchmark_choices,
+)
+
+parser.add_argument(
+    "--benchmark3",
+    type=str,
+    required=False,
+    help="3rd benchmark",
+    choices=benchmark_choices,
+)
+
+parser.add_argument(
+    "--benchmark4",
+    type=str,
+    required=False,
+    help="4th benchmark",
+    choices=benchmark_choices,
+)
+
+parser.add_argument(
+    "--memory",
+    type=str,
+    required=True,
+    help="Input the memory module to run.",
+    choices=memory_choices,
 )
 
 parser.add_argument(
@@ -285,18 +297,6 @@ elif (args.memory == "DDR4"):
     )
 else: # Any kind of configurable memory uses the configurable module
     # Creating secure flag
-    secure_flag = 0 # no security
-    if (args.memory == "hashing_only"): secure_flag = 1
-    elif (args.memory == "encryption_only"): secure_flag = 2
-    elif (args.memory == "hashing+encryption"): secure_flag = 3
-    elif (args.memory == "full_security"): secure_flag = 7
-    elif (args.memory == "no_security" or args.memory == "configurable"): secure_flag = 0
-    else:
-      print(f"Incorrect memory module: {args.memory}")
-      exit
-
-    print(f"\nRunning memory module: {args.memory}\n  secure_flag: {secure_flag}\n\n")
-
     memory = ConfigurableMemory(
         size="16GiB",
         latency=args.encryption_latency,
@@ -306,9 +306,6 @@ else: # Any kind of configurable memory uses the configurable module
         cache_mac=args.cache_mac,
         eager_fetch=args.eager_fetch,
         bonsai=not args.no_bonsai,
-        secure=secure_flag,
-        #l3_cache_size=args.l3_size,
-        #protocol=args.mcx_policy,
     )
 
 
@@ -367,6 +364,12 @@ else:
     bmarks = [args.benchmark]
     if args.benchmark2:
         bmarks.append(args.benchmark2)
+    if args.benchmark3:
+        bmarks.append(args.benchmark2)
+    if args.benchmark4:
+        bmarks.append(args.benchmark2)
+
+
 
     payloads = {}
     guest_args_map = {}
