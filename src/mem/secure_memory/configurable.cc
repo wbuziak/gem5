@@ -125,7 +125,6 @@ Configurable::startup()
             index = 7: full security        111
           */
         epmpTable.pmpEntries[i].security = index; // set security flag
-        epmpTable.pmpEntries[i].asid = 1; // Set ASID for benchmark 1
     }
 
     // Include metadata in the ePMP table with an artificial entry
@@ -145,12 +144,9 @@ Configurable::startup()
     metadata_entry.security = 7; // Set to whatever your required metadata security mode is
     metadata_entry.asid = 0; // we set this to zero because we don't know the benchmark ASID
 
-    epmpTable.pmpEntries.push_back(metadata_entry);
-
     // Prepopulate metadata pages directly into the page map
-    // Assuming 'level_start' and 'end' define your physical metadata region
-    Addr meta_start_pfn = level_start >> 12; // Convert address to 4KiB page frame
-    Addr meta_end_pfn = end >> 12;
+    Addr meta_start_pfn = end >> 12; // Convert address to 4KiB page frame
+    Addr meta_end_pfn = level_start >> 12;
 
     for (Addr pfn = meta_start_pfn; pfn <= meta_end_pfn; pfn++) {
         page_security_map[pfn] = 7; // Set to full metadata security mode
@@ -342,10 +338,10 @@ Configurable::handleRequest(PacketPtr pkt)
     //printf("src/mem/secure_memory/configurable.cc: ASID: %lx\n", req->getSatpContext());
 
     if (pkt->isWrite()) {
-        if (evaluatePmpEntries(req) & (1 << 1)) {
+        if (evaluatePmpEntries(pkt) & (1 << 1)) {
           // Encryption is enabled, fetch counter
           awaiting_counter.emplace(pkt);
-        } else if (evaluatePmpEntries(req) & 1) {
+        } else if (evaluatePmpEntries(pkt) & 1) {
           // Hashing is enabled, but encryption is not. Route to MAC queue.
           // We don't want to wait on the counter
           initiateMac(pkt);
@@ -373,7 +369,7 @@ Configurable::handleRequest(PacketPtr pkt)
 
             // request the mac as well
             // Only if hashing flag is set
-            if (evaluatePmpEntries(req) & 1) {
+            if (evaluatePmpEntries(pkt) & 1) {
               Addr mac_addr = calculateMacAddress(pkt->getAddr());
               RequestPtr req = std::make_shared<Request>(
                   mac_addr, BLOCK_SIZE, 0, 0
@@ -407,7 +403,7 @@ Configurable::handleRequest(PacketPtr pkt)
 
     // send counter request to memory
     // Only when we want to do encryption
-    if (evaluatePmpEntries(req) & (1 << 1)) {
+    if (evaluatePmpEntries(pkt) & (1 << 1)) {
       counter_pkt->allocate();
       if (use_metadata_cache) {
           metadata_request_port.sendPacket(counter_pkt);
@@ -1448,8 +1444,9 @@ Configurable::evaluatePmpEntries(RequestPtr req)
         // Check if physical address and context match the entry
         if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
             // Match global entries (ASID == 0) or specific process ASIDs
-            if (epmpTable.pmpEntries[i].asid == 0 || epmpTable.pmpEntries[i].asid == asid) {
+             if (epmpTable.pmpEntries[i].asid == 0 || epmpTable.pmpEntries[i].asid == asid) {
                 sec_mode = epmpTable.pmpEntries[i].security;
+                printf("ePMP match with asid %lu - security mode: %d\n", asid, sec_mode);
                 break; // Stop at first matching priority entry
             }
         }
@@ -1460,8 +1457,6 @@ Configurable::evaluatePmpEntries(RequestPtr req)
         page_security_map[page_pfn] = sec_mode;
     }
 
-    printf("ePMP match with asid %lu - security mode: %d\n", asid, sec_mode);
-
     return sec_mode;
 }
 
@@ -1471,49 +1466,6 @@ Configurable::evaluatePmpEntries(PacketPtr pkt)
     // A PacketPtr always contains a RequestPtr in gem5
     assert(pkt->req);
     return evaluatePmpEntries(pkt->req);
-}
-
-int
-Configurable::ePMPSecurity(RequestPtr req)
-{
-    Addr paddr = req->getPaddr();
-    unsigned int size = req->getSize();
-    uint64_t pkt_asid = req->getSatpContext();
-    Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
-
-    for (int i = 0; i < epmpTable.pmpEntries.size(); i++) {
-        uint8_t cfg = epmpTable.pmpEntries[i].pmpCfg;
-        uint8_t a_field = pmpGetAField(cfg);
-
-        if (a_field == PMP_OFF) {
-            continue;
-        }
-
-        // Compute physical range for TOR
-        AddrRange pmp_range(0, 0);
-        Addr raw_addr = epmpTable.pmpEntries[i].rawAddr;
-
-        if (a_field == PMP_TOR) {
-            Addr lower = (i > 0) ? (epmpTable.pmpEntries[i - 1].rawAddr << 2) : 0;
-            Addr upper = raw_addr << 2;
-            pmp_range = AddrRange(lower, upper);
-        } else if (a_field == PMP_NA4) {
-            Addr base = raw_addr << 2;
-            pmp_range = AddrRange(base, base + 4);
-        } else if (a_field == PMP_NAPOT) {
-            pmp_range = pmpDecodeNapot(raw_addr);
-        }
-
-        // Check physical address match 
-        if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
-            // Global metadata/system entries (asid == 0) always match
-            if (epmpTable.pmpEntries[i].asid == 0 || epmpTable.pmpEntries[i].asid == pkt_asid) {
-                return epmpTable.pmpEntries[i].security;
-            }
-        }
-    }
-
-    return 0;
 }
 
 // stats function definition

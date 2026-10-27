@@ -442,21 +442,12 @@ else:
 
     # Unpack both binaries
     for i, bm in enumerate(bmarks):
-        command += (
-            f"cat << 'B64EOF{i}' | base64 -d > /root/exec_{bm}\n"
-            f"{payloads[bm]}\n"
-            f"B64EOF{i}\n"
-            f"chmod +x /root/exec_{bm}\n"
-        )
-
-    # Launch both benchmarks in the background
-    for i, bm in enumerate(bmarks):
         bm_type = bm_types.get(bm, "apps") # Dynamically inject 'apps' or 'kernels'
         command += (
             f"mkdir -p /root/run_{bm}\n"
             f"cd /root/run_{bm}\n"
             f"tar -xf {PARSEC_DIR}/pkgs/{bm_type}/{bm}/inputs/input_{args.size}.tar\n"
-            f"/root/exec_{bm} {guest_args_map[bm]} &\n"
+            f"/root/exec_{bm} {guest_args_map[bm]} > /root/run_{bm}/{bm}.log 2>&1 &\n"
             f"PID{i}=$!\n"
         )
 
@@ -464,7 +455,16 @@ else:
     for i in range(len(bmarks)):
         command += f"wait $PID{i}\n"
 
-    command += "echo 'All benchmarks exited'\nm5 exit\n"
+    # Print each log file sequentially to system.terminal
+    for bm in bmarks:
+        command += (
+            f"echo '========================================'\n"
+            f"echo ' Output for {bm}'\n"
+            f"echo '========================================'\n"
+            f"cat /root/run_{bm}/{bm}.log\n"
+        )
+
+    command += "echo 'All benchmarks exited'\nm5 exit\n" 
 
 board.set_kernel_disk_workload(
     bootloader=BootloaderResource(local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"),

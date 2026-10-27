@@ -462,7 +462,6 @@ class Configurable : public SimObject
      * The function will return either the security type or 
      * pass a fault.
     **/
-    int ePMPSecurity(RequestPtr req);
     int evaluatePmpEntries(RequestPtr req);
     int evaluatePmpEntries(PacketPtr pkt);
 
