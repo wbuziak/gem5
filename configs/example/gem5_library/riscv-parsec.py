@@ -105,6 +105,7 @@ memory_choices = [
     "hashing_only",
     "encryption_only",
     "hashing+encryption",
+    "integrity_tree",
     "full_security", # should be identical to integrity_tree
     "no_security",
     "mcx",
