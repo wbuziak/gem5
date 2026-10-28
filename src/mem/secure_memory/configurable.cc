@@ -1180,49 +1180,39 @@ Configurable::CpuSidePort::sendPacket(PacketPtr pkt)
 bool
 Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
 {
-    //assert(getAddrRanges().size() == 1);
-
-    if (pkt->getAddr() >= getAddrRanges().front().end()) {
-        bool is_metadata = parent->isMetadata(pkt->getAddr());
+    // Check if the packet address belongs to the metadata space
+    if (pkt->getAddr() >= getAddrRanges().front().end() || parent->isMetadata(pkt->getAddr())) {
         bool is_mac = parent->isMac(pkt->getAddr());
 
-        if (parent->ePMPSecurity(pkt)) {
-          // integrity checking or encryption
-          if (is_metadata && !is_mac) {
-              // this is a tree node
-              assert(!is_mac);
-              if (parent->use_metadata_cache) {
-                  parent->metadata_response_port.sendPacket(pkt);
-              } else if (parent->bonsai && parent->ePMPSecurity(pkt) & (1 << 2)) {
-                  // Only call this if secure flag is set
-                  // to do integrity checking
-                  assert(parent->handleTreeResponse(pkt));
-              } else {
-                  // this should only be called if we are 
-                  // doing encryption
-                  assert(parent->processCounterResponse(pkt));
-              }
-          } else {
-              // this is a mac
-              assert(is_mac);
-              if (parent->cache_mac) {
-                  parent->metadata_response_port.sendPacket(pkt);
-              } else if (!parent->bonsai && parent->ePMPSecurity(pkt) & (1 << 2)) {
-                  // We only want to handle tree responses when
-                  // doing integrity checking
-                  assert(parent->handleTreeResponse(pkt));
-              } else {
-                  assert(parent->bonsai);
-                  assert(parent->handleMacResponse(pkt));
-              }
-          }
-        } else if (!parent->handleResponse(pkt)) {
-          // We first checked for security, but in the other case
-          // we must still service data packets
-          blocked_responses.push_back(pkt);
+        if (!is_mac) {
+            // Tree node or counter packet
+            if (parent->use_metadata_cache) {
+                parent->metadata_response_port.sendPacket(pkt);
+            } else if (parent->bonsai && (parent->ePMPSecurity(pkt) & (1 << 2))) {
+                assert(parent->handleTreeResponse(pkt));
+            } else if (parent->ePMPSecurity(pkt) & (1 << 1)) {
+                assert(parent->processCounterResponse(pkt));
+            } else {
+                delete pkt; // Safe cleanup for writeback ACKs / unhandled metadata
+            }
+        } else {
+            // MAC packet
+            if (parent->cache_mac) {
+                parent->metadata_response_port.sendPacket(pkt);
+            } else if (!parent->bonsai && (parent->ePMPSecurity(pkt) & (1 << 2))) {
+                assert(parent->handleTreeResponse(pkt));
+            } else if (parent->bonsai && (parent->ePMPSecurity(pkt) & 1)) {
+                assert(parent->handleMacResponse(pkt));
+            } else {
+                delete pkt; // Safe cleanup for writeback ACKs / unhandled MACs
+            }
         }
-    } else if (!parent->handleResponse(pkt)) {
-        blocked_responses.push_back(pkt); // data
+        return true;
+    }
+
+    // Standard user data packet response
+    if (!parent->handleResponse(pkt)) {
+        blocked_responses.push_back(pkt);
     }
 
     return true;
@@ -1387,7 +1377,7 @@ Configurable::ePMPSecurity(RequestPtr req)
     unsigned int size = req->getSize();
     Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
 
-    if (isMetadata(paddr) {
+    if (isMetadata(paddr)) {
         return req->getSecMode();
     }
 
