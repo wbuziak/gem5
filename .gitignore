@@ -41,3 +41,4 @@ riscv-hello-checkpoint/*
 resources/
 results/
 resultsv4/
+parsec-benchmark/

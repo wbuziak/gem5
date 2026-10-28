@@ -55,26 +55,6 @@
 
 namespace gem5::memory {
 
-/** single pmp entry struct*/
-struct PmpEntry
-{
-  /** addr range corresponding to a single pmp entry */
-  AddrRange pmpAddr = AddrRange(0, 0);
-  /** raw addr in pmpaddr register for a pmp entry */
-  Addr rawAddr;
-  /** pmpcfg reg value for a pmp entry */
-  uint8_t pmpCfg = 0;
-
-};
-
-struct ePMPTable {
-  // ePMP table for RISC-V
-  std::vector<PmpEntry> pmpEntries;
-
-  /** tree mode is simply the # of levels in the tree **/
-  uint8_t mode = 0;
-};
-
 class Configurable : public SimObject
 {
     // declare the ports so that we can have them call class functions to
@@ -414,9 +394,6 @@ class Configurable : public SimObject
     Addr calculateMacAddress(Addr data_address); // defined in source
     Addr calculateCounterAddress(Addr data_address); // defined in source
     Addr calculateParentAddress(Addr metadata_address); // defined in source
-
-    // RISC-V ePMP Table (security)
-    ePMPTable epmpTable; 
 
     // for stats, defined in source
     struct ConfigurableStats : public statistics::Group

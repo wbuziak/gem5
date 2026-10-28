@@ -54,9 +54,6 @@ PMP::PMP(const Params &params) :
     hasLockEntry(false)
 {
     pmpTable.resize(pmpEntries);
-    memCtrl = (gem5::memory::Configurable *) SimObject::find("board.memory.secure_memory");
-    if (memCtrl == NULL) { printf("\n\nmemCtrl pointer is NULL\n\n"); }
-    memCtrl->epmpTable.pmpEntries.resize(pmpEntries);
 }
 
 Fault
@@ -177,12 +174,6 @@ PMP::pmpUpdateCfg(uint32_t pmp_index, uint8_t this_cfg)
     pmpTable[pmp_index].pmpCfg = this_cfg;
     pmpUpdateRule(pmp_index);
 
-    // Send to memory encryption engine
-    //printf("src/arch/riscv/pmp.cc: pmpCfg:  %u\n", this_cfg);
-
-    // update ePMPTable within memory controller
-    memCtrl->epmpTable.pmpEntries[pmp_index].pmpCfg = this_cfg;
-
     return true;
 }
 
@@ -239,10 +230,6 @@ PMP::pmpUpdateRule(uint32_t pmp_index)
     if (hasLockEntry) {
         DPRINTF(PMP, "Find lock entry\n");
     }
-
-    // update ePMP table
-    //printf("src/arch/riscv/pmp.cc: pmpAddr: 0x%08x\n", this_cfg);
-    memCtrl->epmpTable.pmpEntries[pmp_index].rawAddr = this_addr;
 }
 
 void
