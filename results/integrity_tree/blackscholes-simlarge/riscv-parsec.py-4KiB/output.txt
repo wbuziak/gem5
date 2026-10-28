@@ -1,0 +1,37 @@
+Global frequency set at 1000000000000 ticks per second
+warn: No dot file generated. Please install pydot to generate the dot file and pdf.
+src/mem/dram_interface.cc:690: warn: DRAM device capacity (0 Mbytes) does not match the address range assigned (16384 Mbytes)
+      0: board.platform.rtc: Real-time clock set to Sun Jan  1 00:00:00 2012
+board.platform.terminal: Listening for connections on port 3456
+src/arch/riscv/isa.cc:279: info: RVV enabled, VLEN = 256 bits, ELEN = 64 bits
+src/tcmalloc.cc:304] Attempt to free invalid pointer 0x8 
+Program aborted at tick 0
+--- BEGIN LIBC BACKTRACE ---
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(_ZN4gem515print_backtraceEv+0x40)[0xbf5d8f0575d0]
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(_ZN4gem512abortHandlerEi+0x60)[0xbf5d8f07fa04]
+linux-vdso.so.1(__kernel_rt_sigreturn+0x0)[0xe3baabb8d8f8]
+/lib/aarch64-linux-gnu/libc.so.6(+0x874d8)[0xe3baaa8a74d8]
+/lib/aarch64-linux-gnu/libc.so.6(gsignal+0x1c)[0xe3baaa85cb3c]
+/lib/aarch64-linux-gnu/libc.so.6(abort+0xf4)[0xe3baaa847e00]
+/lib/aarch64-linux-gnu/libtcmalloc_minimal.so.4(_ZN8tcmalloc3LogENS_7LogModeEPKciNS_7LogItemES3_S3_S3_+0x1c8)[0xe3baab06f6e8]
+/lib/aarch64-linux-gnu/libtcmalloc_minimal.so.4(+0xf7b0)[0xe3baab06f7b0]
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(_ZN4gem58RiscvISA3PMPC2ERKNS_9PMPParamsE+0xe0)[0xbf5d8db1ba50]
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(_ZNK4gem59PMPParams6createEv+0x24)[0xbf5d8dbeb0e4]
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(+0xf20e78)[0xbf5d8dbf0e78]
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(+0xb7cd18)[0xbf5d8d84cd18]
+/lib/aarch64-linux-gnu/libpython3.12.so.1.0(+0x1d6754)[0xe3baab476754]
+/lib/aarch64-linux-gnu/libpython3.12.so.1.0(_PyObject_MakeTpCall+0x88)[0xe3baab41ebb8]
+/lib/aarch64-linux-gnu/libpython3.12.so.1.0(_PyEval_EvalFrameDefault+0x395c)[0xe3baab3be0dc]
+/lib/aarch64-linux-gnu/libpython3.12.so.1.0(PyEval_EvalCode+0x23c)[0xe3baab52fd3c]
+/lib/aarch64-linux-gnu/libpython3.12.so.1.0(+0x28bff4)[0xe3baab52bff4]
+/lib/aarch64-linux-gnu/libpython3.12.so.1.0(+0x1d6e00)[0xe3baab476e00]
+/lib/aarch64-linux-gnu/libpython3.12.so.1.0(PyObject_Vectorcall+0x58)[0xe3baab41ee98]
+/lib/aarch64-linux-gnu/libpython3.12.so.1.0(_PyEval_EvalFrameDefault+0x395c)[0xe3baab3be0dc]
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(+0x23b1630)[0xbf5d8f081630]
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(main+0x198)[0xbf5d8d835a58]
+/lib/aarch64-linux-gnu/libc.so.6(+0x284c4)[0xe3baaa8484c4]
+/lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0x98)[0xe3baaa848598]
+/home/wbuziak/repos/gem5/build/RISCV/gem5.opt(_start+0x30)[0xbf5d8d83d4b0]
+--- END LIBC BACKTRACE ---
+For more info on how to address this issue, please visit https://www.gem5.org/documentation/general_docs/common-errors/ 
+

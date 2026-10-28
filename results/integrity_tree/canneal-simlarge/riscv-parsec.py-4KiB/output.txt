@@ -1,0 +1,3 @@
+Global frequency set at 1000000000000 ticks per second
+warn: No dot file generated. Please install pydot to generate the dot file and pdf.
+src/mem/dram_interface.cc:690: warn: DRAM device capacity (0 Mbytes) does not match the address range assigned (16384 Mbytes)

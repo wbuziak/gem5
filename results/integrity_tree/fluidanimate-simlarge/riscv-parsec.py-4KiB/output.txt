@@ -1,0 +1,23 @@
+usage: riscv-parsec.py [-h] --benchmark
+                       {blackscholes,bodytrack,canneal,dedup,facesim,ferret,fluidanimate,freqmine,raytrace,streamcluster,swaptions,vips,x264,microbenchmark}
+                       --memory
+                       {configurable,hashing_only,encryption_only,hashing+encryption,integrity_treefull_security,no_security,mcx,DDR4}
+                       [--benchmark2 {blackscholes,bodytrack,canneal,dedup,facesim,ferret,fluidanimate,freqmine,raytrace,streamcluster,swaptions,vips,x264,microbenchmark}]
+                       [--memory2 {configurable,hashing_only,encryption_only,hashing+encryption,integrity_treefull_security,no_security,mcx,DDR4}]
+                       --size {simsmall,simmedium,simlarge}
+                       [--metadata_cache_size METADATA_CACHE_SIZE]
+                       [--no_metadata_cache] [--arity ARITY]
+                       [--encryption_latency ENCRYPTION_LATENCY] [--cache_mac]
+                       [--eager_fetch] [--no_bonsai] --l3_size L3_SIZE
+                       --mcx_policy
+                       {insecure,never,always,counter,hotspot,read-write,approx-ancestors,approx-ancestors-v2,l3-hitrate}
+riscv-parsec.py: error: argument --memory: invalid choice: 'integrity_tree' (choose from 'configurable', 'hashing_only', 'encryption_only', 'hashing+encryption', 'integrity_treefull_security', 'no_security', 'mcx', 'DDR4')
+gem5 Simulator System.  https://www.gem5.org
+gem5 is copyrighted software; use the --copyright option for details.
+
+gem5 version 24.1.0.2
+gem5 compiled Oct 22 2026 02:43:02
+gem5 started Oct 28 2026 18:45:31
+gem5 executing on iris-arm-server-5, pid 3374261
+command line: /home/wbuziak/repos/gem5/build/RISCV/gem5.opt -d /home/wbuziak/repos/gem5/results/integrity_tree/fluidanimate-simlarge/riscv-parsec.py-4KiB /home/wbuziak/repos/gem5/configs/example/gem5_library/riscv-parsec.py --benchmark fluidanimate --size simlarge --metadata_cache_size 4KiB --memory integrity_tree --l3_size 256KiB --mcx_policy never
+
