@@ -330,11 +330,6 @@ Configurable::handleRequest(PacketPtr pkt)
     // Inherit the RISC-V SATP Context (ASID) for benchmark tagging
     int sec_mode = evaluatePmpEntries(pkt);
 
-    // Repurpose the unused ASID field to store the security mode!
-    req->setSatpContext(sec_mode);
-
-    //printf("src/mem/secure_memory/configurable.cc: ASID: %lx\n", req->getSatpContext());
-
     if (pkt->isWrite()) {
         if (sec_mode & (1 << 1)) {
           // Encryption is enabled, fetch counter
@@ -372,7 +367,6 @@ Configurable::handleRequest(PacketPtr pkt)
               RequestPtr req = std::make_shared<Request>(
                   mac_addr, BLOCK_SIZE, 0, 0
               );
-              req->setSatpContext(sec_mode); // Tag the MAC request!
               PacketPtr mac_pkt = Packet::createRead(req);
 
               // send mac to memory
@@ -382,17 +376,15 @@ Configurable::handleRequest(PacketPtr pkt)
                   metadata_request_port.sendPacket(mac_pkt);
               } else {
                   mem_port.sendPacket(mac_pkt);
+                }
+            }
 
-                  if (!bonsai) {
-                      bool success;
-                      std::tie(std::ignore, success) =
-                          needs_authentication.emplace(mac_addr, 1);
-
-                      if (!success) {
-                          needs_authentication[mac_addr]++;
-                      }
-                  }
-               }
+            // Populate integrity tracking if Integrity is enabled
+            if (sec_mode & (1 << 2)) {
+                Addr leaf_addr = bonsai ? counter_addr : calculateMacAddress(pkt->getAddr());
+                bool auth_success;
+                std::tie(std::ignore, auth_success) = needs_authentication.emplace(leaf_addr, 1);
+                if (!auth_success) { needs_authentication[leaf_addr]++; }
             }
         } else {
             delete counter_pkt;
@@ -424,9 +416,8 @@ Configurable::handleMetadataCacheMiss(PacketPtr pkt)
     assert(pkt->isRead());
     assert(isMetadata(pkt->getAddr()));
     assert(!isMac(pkt->getAddr()) || cache_mac);
-    assert(evaluatePmpEntries(pkt) > 0);
 
-    if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1] && evaluatePmpEntries(pkt) & 1) {
+    if (!isMac(pkt->getAddr()) && pkt->getAddr() < integrity_levels[1]) {
         // this is a tree node, we need to track the miss
         if ((!isMac(pkt->getAddr()) && !isCounter(pkt->getAddr())) ||
             (bonsai && isCounter(pkt->getAddr())) ||
@@ -548,7 +539,9 @@ Configurable::processCounterResponse(PacketPtr pkt)
 bool
 Configurable::handleCounterResponse(PacketPtr pkt)
 {
-    assert(evaluatePmpEntries(pkt) & (1 << 1));
+    if (!isMetadata(pkt->getAddr())) {
+        assert(evaluatePmpEntries(pkt) & (1 << 1));
+    }
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -577,7 +570,7 @@ Configurable::handleCounterResponse(PacketPtr pkt)
                 // not sure who will trigger retry event if this fails
                 assert((*it)->isRequest());
                 // Only call initiateMac if doing hashing
-                if (evaluatePmpEntries(pkt) & 1) {
+                if (evaluatePmpEntries(*it) & 1) {
                     if (!initiateMac(*it)) {
                         pending_mac.push_back(*it);
                     }
@@ -601,7 +594,9 @@ Configurable::handleCounterResponse(PacketPtr pkt)
 bool
 Configurable::handleTreeResponse(PacketPtr pkt)
 {
-    assert(evaluatePmpEntries(pkt) & (1 << 2));
+    if (!isMetadata(pkt->getAddr())) {
+        assert(evaluatePmpEntries(pkt) & (1 << 2));
+    }
     if (needs_authentication.find(pkt->getAddr()) !=
         needs_authentication.end())
     {
@@ -614,10 +609,10 @@ Configurable::handleTreeResponse(PacketPtr pkt)
         {
             if (parent_addr == (*it)->getAddr()) {
                 assert(!authenticated);
-                if (evaluatePmpEntries(pkt) & 1) {
+                if (evaluatePmpEntries(*it) & 1) {
                   // Only go through mac process if hashing
                   // We will just assume authenticated otherwise
-                  initiateMac(pkt);
+                  initiateMac(*it);
                 }
                 authenticated = true;
 
@@ -659,7 +654,6 @@ Configurable::handleTreeResponse(PacketPtr pkt)
                 RequestPtr req = std::make_shared<Request>(
                     parent_addr, BLOCK_SIZE, 0, 0
                 );
-                req->setSatpContext(evaluatePmpEntries(pkt));
                 PacketPtr parent_pkt = Packet::createRead(req);
 
                 // send to cache
@@ -680,7 +674,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
             if (calculateParentAddress((*it)->getAddr()) == pkt->getAddr()) {
                 // authenticate the child node
                 assert((*it)->isWrite() || (*it)->isResponse());
-                if (evaluatePmpEntries(pkt) & 1) {
+                if (evaluatePmpEntries(*it) & 1) {
                   // Only go through mac process if hashing
                   // We will just authenticate otherwise
                   initiateMac(*it);
@@ -710,25 +704,37 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 
         if (isCounter(pkt->getAddr())) {
             assert(bonsai);
-            // Only route to counter response if encryption is actually enabled
-            if (evaluatePmpEntries(pkt) & (1 << 1)) {
+            // Check if ANY data packet is actively waiting on this counter for encryption
+            bool needed_for_cipher = false;
+            for (auto it = awaiting_counter.begin(); it != awaiting_counter.end(); ++it) {
+                if (calculateCounterAddress((*it)->getAddr()) == pkt->getAddr()) {
+                    needed_for_cipher = true;
+                    break;
+                }
+            }
+
+            if (needed_for_cipher) {
                 assert(handleCounterResponse(pkt));
             } else {
-                // If encryption is disabled, this counter was only fetched 
-                // as a structural leaf of the integrity tree. It is no longer needed.
-                delete pkt;
+                delete pkt; // Purely integrity leaf, safely discard.
             }
         } else if (isMac(pkt->getAddr())) {
             assert(!bonsai);
-            // Only route to MAC response if hashing is actually enabled
-            if (evaluatePmpEntries(pkt) & 1) {
+            // Check if ANY data packet is actively waiting on this MAC for hashing
+            bool needed_for_hashing = false;
+            for (auto it = awaiting_mac.begin(); it != awaiting_mac.end(); ++it) {
+                if (calculateMacAddress((*it)->getAddr()) == pkt->getAddr()) {
+                    needed_for_hashing = true;
+                    break;
+                }
+            }
+
+            if (needed_for_hashing) {
                 assert(handleMacResponse(pkt));
             } else {
-                // If hashing is disabled, this MAC was only fetched 
-                // as a structural leaf of the integrity tree. It is no longer needed.
-                delete pkt;
+                delete pkt; // Purely integrity leaf, safely discard.
             }
-        } else {
+        } else { 
             if (pkt->isRead() && !child_authenticated) {
                 awaiting_child.emplace(pkt);
             } else {
@@ -743,7 +749,9 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 bool
 Configurable::handleMacResponse(PacketPtr pkt)
 {
-    assert(evaluatePmpEntries(pkt) & 1);
+    if (!isMetadata(pkt->getAddr())) {
+        assert(evaluatePmpEntries(pkt) & 1);
+    }
     // check for data that uses this counter
     for (auto it = pending_reads.begin();
               it != pending_reads.end();
@@ -784,7 +792,9 @@ Configurable::handleMacResponse(PacketPtr pkt)
 bool
 Configurable::initiateCipher(PacketPtr pkt)
 {
-    assert(evaluatePmpEntries(pkt) & (1 << 1));
+    if (!isMetadata(pkt->getAddr())) {
+        assert(evaluatePmpEntries(pkt) & (1 << 1));
+    }
     // need to decrypt the data prior to sending to processor
     if (cipher_queue.size() == max_cipher_size) {
         return false;
@@ -829,7 +839,9 @@ Configurable::initiateCipher(PacketPtr pkt)
 bool
 Configurable::initiateMac(PacketPtr pkt)
 {
-    assert(evaluatePmpEntries(pkt) & 1);
+    if (!isMetadata(pkt->getAddr())) {
+        assert(evaluatePmpEntries(pkt) & 1);
+    }
     // need to decrypt the data prior to sending to processor
     if (hashing_queue.size() == max_mac_size) {
         return false;
@@ -924,18 +936,19 @@ Configurable::cipherEngine()
         cipher_queue.front().second < xor_queue.front().second))
     {
         pkt = cipher_queue.front().first;
-        assert(evaluatePmpEntries(pkt) & (1 << 1));
         cipher_queue.pop_front();
     } else {
         assert(!xor_queue.empty());
         pkt = xor_queue.front().first;
-        assert(evaluatePmpEntries(pkt) & (1 << 1));
         xor_queue.pop_front();
     }
 
+    if (!isMetadata(pkt->getAddr())) {
+       assert(evaluatePmpEntries(pkt) & (1 << 1));
+    }
 
     if (isCounter(pkt->getAddr())) {
-        if (bonsai && (evaluatePmpEntries(pkt) & (1 << 2))) {
+        if (bonsai && needs_authentication.find(pkt->getAddr()) != needs_authentication.end()) {
             // Only when integrity checking
             handleTreeResponse(pkt); // checks if data is trusted first
         } else {
@@ -1002,8 +1015,11 @@ Configurable::macEngine()
     assert(!hashing_queue.empty());
 
     PacketPtr pkt = hashing_queue.front().first;
-    assert(evaluatePmpEntries(pkt) & 1);
     hashing_queue.pop_front();
+
+    if (!isMetadata(pkt->getAddr())) {
+        assert(evaluatePmpEntries(pkt) & 1);
+    }
 
     if (isMetadata(pkt->getAddr())) {
         handleTreeResponse(pkt);
@@ -1220,26 +1236,35 @@ Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
     if (pkt->getAddr() >= getAddrRanges().front().end()) {
         bool is_metadata = parent->isMetadata(pkt->getAddr());
         bool is_mac = parent->isMac(pkt->getAddr());
+        bool is_counter = parent->isCounter(pkt->getAddr());
 
         if (parent->evaluatePmpEntries(pkt)) {
           // integrity checking or encryption
-          if (is_metadata && !is_mac) {
-              // this is a tree node
-              assert(!is_mac);
-              if (parent->use_metadata_cache) {
-                  parent->metadata_response_port.sendPacket(pkt);
-              } else if (parent->bonsai && (parent->evaluatePmpEntries(pkt) & (1 << 2))) {
-                  // Only call this if secure flag is set
-                  // to do integrity checking
-                  assert(parent->handleTreeResponse(pkt));
-              } else if (parent->evaluatePmpEntries(pkt) & (1 << 1)) {
-                  // Explicitly check for encryption before handling counter
-                  assert(parent->processCounterResponse(pkt));
-              } else {
-                  // Safely drop or bypass if no relevant security applies
-                  delete pkt;
-              }
-          } else {
+          if (is_metadata) {
+            if (parent->use_metadata_cache && (!is_mac || parent->cache_mac)) {
+                parent->metadata_response_port.sendPacket(pkt);
+            } else {
+                if (!is_mac && !is_counter) {
+                    // Tree nodes always route to Tree Response
+                    assert(parent->handleTreeResponse(pkt));
+                } else if (is_counter) {
+                    // Route to tree if expected for integrity authentication
+                    if (parent->bonsai && parent->needs_authentication.find(pkt->getAddr()) != parent->needs_authentication.end()) {
+                        assert(parent->handleTreeResponse(pkt));
+                    } else {
+                        // Otherwise it was fetched purely for Encryption
+                        assert(parent->processCounterResponse(pkt));
+                    }
+                } else { // is_mac
+                    if (!parent->bonsai && parent->needs_authentication.find(pkt->getAddr()) != parent->needs_authentication.end()) {
+                        assert(parent->handleTreeResponse(pkt));
+                    } else {
+                        assert(parent->handleMacResponse(pkt));
+                    }
+                }
+            }
+            return true;
+        } else {
               // this is a mac
               assert(is_mac);
               if (parent->cache_mac) {
@@ -1302,24 +1327,22 @@ Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
         return true;
     }
 
-    // Otherwise, route read responses based on address and enabled features
+    // Route read responses based on internal state queues, not ePMP
     if (parent->isMac(pkt->getAddr())) {
-        if (parent->bonsai && (parent->evaluatePmpEntries(pkt) & 1)) {
-            return parent->handleMacResponse(pkt);
-        } else if (parent->evaluatePmpEntries(pkt) & (1 << 2)) {
+        if (!parent->bonsai && parent->needs_authentication.find(pkt->getAddr()) != parent->needs_authentication.end()) {
             return parent->handleTreeResponse(pkt);
         } else {
-            delete pkt;
-            return true;
+            return parent->handleMacResponse(pkt);
         }
-    } else if (parent->isCounter(pkt->getAddr()) && (parent->evaluatePmpEntries(pkt) & (1 << 1))) {
-        return parent->processCounterResponse(pkt);
-    } else if (parent->evaluatePmpEntries(pkt) & (1 << 2)) {
-        return parent->handleTreeResponse(pkt);
+    } else if (parent->isCounter(pkt->getAddr())) {
+        if (parent->bonsai && parent->needs_authentication.find(pkt->getAddr()) != parent->needs_authentication.end()) {
+            return parent->handleTreeResponse(pkt);
+        } else {
+            return parent->processCounterResponse(pkt);
+        }
     } else {
-        // Fallback for packets that do not match the expected security mode for their address
-        delete pkt;
-        return true;
+        // Must be a structural tree node
+        return parent->handleTreeResponse(pkt);
     } 
 }
 
@@ -1428,7 +1451,6 @@ Configurable::evaluatePmpEntries(RequestPtr req)
 {
     Addr paddr = req->getPaddr();
     unsigned int size = req->getSize();
-    uint64_t asid = req->getSatpContext();
     Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
 
     // Perform strictly hardware-based PMP table lookup
@@ -1458,7 +1480,7 @@ Configurable::evaluatePmpEntries(RequestPtr req)
         if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
             // Match global entries (ASID == 0) or specific process ASIDs
             sec_mode = epmpTable.pmpEntries[i].security;
-            printf("ePMP match with asid %lu - security mode: %d\n", asid, sec_mode);
+            printf("ePMP match with security mode: %d\n", sec_mode);
             break; // Stop at first matching priority entry
         }
     }
