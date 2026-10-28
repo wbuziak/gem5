@@ -125,6 +125,7 @@ Configurable::startup()
             index = 7: full security        111
           */
         epmpTable.pmpEntries[i].security = index; // set security flag
+        epmpTable.pmpEntries[i].asid = 1; // Set ASID for benchmark 1
     }
 
     // Include metadata in the ePMP table with an artificial entry
@@ -144,13 +145,7 @@ Configurable::startup()
     metadata_entry.security = 7; // Set to whatever your required metadata security mode is
     metadata_entry.asid = 0; // we set this to zero because we don't know the benchmark ASID
 
-    // Prepopulate metadata pages directly into the page map
-    Addr meta_start_pfn = end >> 12; // Convert address to 4KiB page frame
-    Addr meta_end_pfn = level_start >> 12;
-
-    for (Addr pfn = meta_start_pfn; pfn <= meta_end_pfn; pfn++) {
-        page_security_map[pfn] = 7; // Set to full metadata security mode
-    }
+    epmpTable.pmpEntries.push_back(metadata_entry);
 
     // Hit rate for deciding when to change security
     metadata_cache_accesses = 0;
@@ -1407,16 +1402,9 @@ int
 Configurable::evaluatePmpEntries(RequestPtr req)
 {
     Addr paddr = req->getPaddr();
-    Addr page_pfn = paddr >> 12; // 4KiB page size shift
     unsigned int size = req->getSize();
     uint64_t asid = req->getSatpContext();
     Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
-
-    // Check Physical Page Map (Catches evictions and known pages)
-    auto page_it = page_security_map.find(page_pfn);
-    if (page_it != page_security_map.end()) {
-        return page_it->second;
-    }
 
     // Perform strictly hardware-based PMP table lookup
     int sec_mode = 0;
@@ -1444,17 +1432,10 @@ Configurable::evaluatePmpEntries(RequestPtr req)
         // Check if physical address and context match the entry
         if (pmp_range.contains(paddr) && pmp_range.contains(end_paddr)) {
             // Match global entries (ASID == 0) or specific process ASIDs
-             if (epmpTable.pmpEntries[i].asid == 0 || epmpTable.pmpEntries[i].asid == asid) {
-                sec_mode = epmpTable.pmpEntries[i].security;
-                printf("ePMP match with asid %lu - security mode: %d\n", asid, sec_mode);
-                break; // Stop at first matching priority entry
-            }
+            sec_mode = epmpTable.pmpEntries[i].security;
+            printf("ePMP match with asid %lu - security mode: %d\n", asid, sec_mode);
+            break; // Stop at first matching priority entry
         }
-    }
-
-    // Cache the result for future accesses and cache writebacks
-    if (sec_mode != 0) {
-        page_security_map[page_pfn] = sec_mode;
     }
 
     return sec_mode;
