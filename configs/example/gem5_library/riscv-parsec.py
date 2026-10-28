@@ -499,11 +499,16 @@ def handle_exit():
     yield False
 
 def handle_max_insts():
-    print()
-    print("Maximum instructions reached")
-    print("Dump stats at the end of the ROI!")
+    print("\n[Warmup Complete] Resetting stats for actual measurement phase...")
+    m5.stats.reset()
+    
+    # Schedule end of Measurement (500 million instructions)
+    simulator.schedule_max_insts(500000000)
+    yield False  # Resume simulation for ROI measurement
+
+    # Triggered when Measurement finishes
+    print("\n[Measurement Complete] Dumping stats at end of ROI!")
     m5.stats.dump()
-    print()
     yield True
 
 simulator = Simulator(

@@ -64,8 +64,7 @@ struct PmpEntry
   Addr rawAddr;
   /** pmpcfg reg value for a pmp entry */
   uint8_t pmpCfg = 0;
-  /** Benchmark tagging **/
-  uint64_t asid;
+
   /** Security mode  **/
   uint8_t security = 7;
 };
@@ -419,8 +418,6 @@ class Configurable : public SimObject
     // RISC-V ePMP Table (security)
     ePMPTable epmpTable; 
 
-    std::unordered_map<Addr, int> page_security_map;
-
     // RISC-V PMP helper functions
     // These are ripped straight from
     // src/arch/riscv/pmp.cc (Oct 2026)
@@ -462,8 +459,8 @@ class Configurable : public SimObject
      * The function will return either the security type or 
      * pass a fault.
     **/
-    int evaluatePmpEntries(RequestPtr req);
-    int evaluatePmpEntries(PacketPtr pkt);
+    int ePMPSecurity(RequestPtr req);
+    int ePMPSecurity(PacketPtr pkt);
 
     // Metadata stats for tracking
     uint64_t metadata_cache_accesses;

@@ -342,9 +342,9 @@ class Request : public Extensible<Request>
 
     };
 
-    void setSatpContext(uint64_t ctx) { _riscvSatpContext = ctx; }
-    uint64_t getSatpContext() const { return _riscvSatpContext; } // getter & setters for ePMP
-
+    void setSecMode(uint8_t mode) { _secMode = mode; }
+    uint8_t getSecMode() const { return _secMode; } // getters and setters for ePMP security 
+    
     using LocalAccessor =
         std::function<Cycles(ThreadContext *tc, Packet *pkt)>;
 
@@ -352,7 +352,7 @@ class Request : public Extensible<Request>
     typedef uint16_t PrivateFlagsType;
     typedef gem5::Flags<PrivateFlagsType> PrivateFlags;
 
-    uint64_t _riscvSatpContext; // ePMPTable helper field (Persistent ASID)
+    uint8_t _secMode; // Persistent ePMPTable security mode for metadata
 
     enum : PrivateFlagsType
     {
