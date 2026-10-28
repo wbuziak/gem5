@@ -328,15 +328,18 @@ Configurable::handleRequest(PacketPtr pkt)
     }
 
     // Inherit the RISC-V SATP Context (ASID) for benchmark tagging
-    req->setSatpContext(pkt->req->getSatpContext());
+    int sec_mode = evaluatePmpEntries(pkt);
+
+    // Repurpose the unused ASID field to store the security mode!
+    req->setSatpContext(sec_mode);
 
     //printf("src/mem/secure_memory/configurable.cc: ASID: %lx\n", req->getSatpContext());
 
     if (pkt->isWrite()) {
-        if (evaluatePmpEntries(pkt) & (1 << 1)) {
+        if (sec_mode & (1 << 1)) {
           // Encryption is enabled, fetch counter
           awaiting_counter.emplace(pkt);
-        } else if (evaluatePmpEntries(pkt) & 1) {
+        } else if (sec_mode & 1) {
           // Hashing is enabled, but encryption is not. Route to MAC queue.
           // We don't want to wait on the counter
           initiateMac(pkt);
@@ -364,11 +367,12 @@ Configurable::handleRequest(PacketPtr pkt)
 
             // request the mac as well
             // Only if hashing flag is set
-            if (evaluatePmpEntries(pkt) & 1) {
+            if (sec_mode & 1) {
               Addr mac_addr = calculateMacAddress(pkt->getAddr());
               RequestPtr req = std::make_shared<Request>(
                   mac_addr, BLOCK_SIZE, 0, 0
               );
+              req->setSatpContext(sec_mode); // Tag the MAC request!
               PacketPtr mac_pkt = Packet::createRead(req);
 
               // send mac to memory
@@ -398,7 +402,7 @@ Configurable::handleRequest(PacketPtr pkt)
 
     // send counter request to memory
     // Only when we want to do encryption
-    if (evaluatePmpEntries(pkt) & (1 << 1)) {
+    if (sec_mode & (1 << 1)) {
       counter_pkt->allocate();
       if (use_metadata_cache) {
           metadata_request_port.sendPacket(counter_pkt);
@@ -655,6 +659,7 @@ Configurable::handleTreeResponse(PacketPtr pkt)
                 RequestPtr req = std::make_shared<Request>(
                     parent_addr, BLOCK_SIZE, 0, 0
                 );
+                req->setSatpContext(evaluatePmpEntries(pkt));
                 PacketPtr parent_pkt = Packet::createRead(req);
 
                 // send to cache
@@ -705,19 +710,31 @@ Configurable::handleTreeResponse(PacketPtr pkt)
 
         if (isCounter(pkt->getAddr())) {
             assert(bonsai);
-            assert(evaluatePmpEntries(pkt) & (1 << 1));
-            assert(handleCounterResponse(pkt));
+            // Only route to counter response if encryption is actually enabled
+            if (evaluatePmpEntries(pkt) & (1 << 1)) {
+                assert(handleCounterResponse(pkt));
+            } else {
+                // If encryption is disabled, this counter was only fetched 
+                // as a structural leaf of the integrity tree. It is no longer needed.
+                delete pkt;
+            }
         } else if (isMac(pkt->getAddr())) {
             assert(!bonsai);
-            assert(evaluatePmpEntries(pkt) & 1);
-            assert(handleMacResponse(pkt));
+            // Only route to MAC response if hashing is actually enabled
+            if (evaluatePmpEntries(pkt) & 1) {
+                assert(handleMacResponse(pkt));
+            } else {
+                // If hashing is disabled, this MAC was only fetched 
+                // as a structural leaf of the integrity tree. It is no longer needed.
+                delete pkt;
+            }
         } else {
             if (pkt->isRead() && !child_authenticated) {
                 awaiting_child.emplace(pkt);
             } else {
                 delete pkt;
             }
-        }
+        } 
     }
 
     return true;
@@ -1211,28 +1228,33 @@ Configurable::MemSidePort::recvTimingResp(PacketPtr pkt)
               assert(!is_mac);
               if (parent->use_metadata_cache) {
                   parent->metadata_response_port.sendPacket(pkt);
-              } else if (parent->bonsai && parent->evaluatePmpEntries(pkt) & (1 << 2)) {
+              } else if (parent->bonsai && (parent->evaluatePmpEntries(pkt) & (1 << 2))) {
                   // Only call this if secure flag is set
                   // to do integrity checking
                   assert(parent->handleTreeResponse(pkt));
-              } else {
-                  // this should only be called if we are 
-                  // doing encryption
+              } else if (parent->evaluatePmpEntries(pkt) & (1 << 1)) {
+                  // Explicitly check for encryption before handling counter
                   assert(parent->processCounterResponse(pkt));
+              } else {
+                  // Safely drop or bypass if no relevant security applies
+                  delete pkt;
               }
           } else {
               // this is a mac
               assert(is_mac);
               if (parent->cache_mac) {
                   parent->metadata_response_port.sendPacket(pkt);
-              } else if (!parent->bonsai && parent->evaluatePmpEntries(pkt) & (1 << 2)) {
+              } else if (!parent->bonsai && (parent->evaluatePmpEntries(pkt) & (1 << 2))) {
                   // We only want to handle tree responses when
                   // doing integrity checking
                   assert(parent->handleTreeResponse(pkt));
-              } else {
-                  assert(parent->bonsai);
+              } else if (parent->bonsai && (parent->evaluatePmpEntries(pkt) & 1)) {
+                  // Explicitly check hashing bit
                   assert(parent->handleMacResponse(pkt));
-              }
+              } else {
+                  // Safely drop or bypass
+                  delete pkt;
+              } 
           }
         } else if (!parent->handleResponse(pkt)) {
           // We first checked for security, but in the other case
@@ -1273,8 +1295,6 @@ Configurable::MemSidePort::sendPacket(PacketPtr pkt)
 bool
 Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
 {
-    
-
     // If it's a write response (ACK), just delete it and return.
     // Metadata writes do not require further processing.
     if (pkt->isWrite()) {
@@ -1284,18 +1304,23 @@ Configurable::MetadataRequestPort::recvTimingResp(PacketPtr pkt)
 
     // Otherwise, route read responses based on address and enabled features
     if (parent->isMac(pkt->getAddr())) {
-        if (parent->bonsai && parent->evaluatePmpEntries(pkt) & 1) {
+        if (parent->bonsai && (parent->evaluatePmpEntries(pkt) & 1)) {
             return parent->handleMacResponse(pkt);
-        } else {
-            assert(parent->evaluatePmpEntries(pkt) & (1 << 2));
+        } else if (parent->evaluatePmpEntries(pkt) & (1 << 2)) {
             return parent->handleTreeResponse(pkt);
+        } else {
+            delete pkt;
+            return true;
         }
-    } else if (parent->isCounter(pkt->getAddr()) && parent->evaluatePmpEntries(pkt) & (1 << 1)) {
+    } else if (parent->isCounter(pkt->getAddr()) && (parent->evaluatePmpEntries(pkt) & (1 << 1))) {
         return parent->processCounterResponse(pkt);
-    } else {
-        assert(parent->evaluatePmpEntries(pkt) & (1 << 2));
+    } else if (parent->evaluatePmpEntries(pkt) & (1 << 2)) {
         return parent->handleTreeResponse(pkt);
-    }
+    } else {
+        // Fallback for packets that do not match the expected security mode for their address
+        delete pkt;
+        return true;
+    } 
 }
 
 void
