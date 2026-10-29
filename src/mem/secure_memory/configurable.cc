@@ -114,14 +114,13 @@ Configurable::startup()
     // Set security mode manually
 
     for (i = 0; i < epmpTable.pmpEntries.size(); i++) {
-        index = i % 6;
-        if (index == 5) index = 7; 
+        index = i % 5;
+        if (index == 4) index = 7; 
           /*
             index = 0: no security          000
             index = 1: hashing only         001
             index = 2: encryption only      010
             index = 3: hashing + encryption 011
-            index = 4: integrity checks     100
             index = 7: full security        111
           */
         epmpTable.pmpEntries[i].security = index; // set security flag
@@ -1387,7 +1386,7 @@ Configurable::ePMPSecurity(RequestPtr req)
     unsigned int size = req->getSize();
     Addr end_paddr = (size > 0) ? (paddr + size - 1) : paddr;
 
-    if (isMetadata(paddr) {
+    if (isMetadata(paddr)) {
         return req->getSecMode();
     }
 
