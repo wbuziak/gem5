@@ -51,6 +51,7 @@ import argparse
 import sys
 import time
 import os
+import base64
 
 import m5
 from m5.objects import Root
@@ -79,6 +80,7 @@ from gem5.isas import ISA
 from gem5.simulate.exit_event import ExitEvent
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
+from socket import gethostname
 
 
 benchmark_choices = [
@@ -101,13 +103,8 @@ benchmark_choices = [
 # Memory module choices
 
 memory_choices = [
-    "configurable",
-    "hashing_only",
-    "encryption_only",
-    "hashing+encryption",
+    "configurable", # configurability based on ePMP security
     "integrity_tree",
-    "full_security", # should be identical to integrity_tree
-    "no_security",
     "mcx",
     "DDR4", # Regular DDR4 module from gem5
 ]
@@ -131,10 +128,42 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--benchmark2",
+    type=str,
+    required=False,
+    help="2nd benchmark",
+    choices=benchmark_choices,
+)
+
+parser.add_argument(
+    "--benchmark3",
+    type=str,
+    required=False,
+    help="3rd benchmark",
+    choices=benchmark_choices,
+)
+
+parser.add_argument(
+    "--benchmark4",
+    type=str,
+    required=False,
+    help="4th benchmark",
+    choices=benchmark_choices,
+)
+
+parser.add_argument(
     "--memory",
     type=str,
     required=True,
     help="Input the memory module to run.",
+    choices=memory_choices,
+)
+
+parser.add_argument(
+    "--memory2",
+    type=str,
+    required=False,
+    help="Which security protocol for 2nd benchmark.",
     choices=memory_choices,
 )
 
@@ -268,18 +297,6 @@ elif (args.memory == "DDR4"):
     )
 else: # Any kind of configurable memory uses the configurable module
     # Creating secure flag
-    secure_flag = 0 # no security
-    if (args.memory == "hashing_only"): secure_flag = 1
-    elif (args.memory == "encryption_only"): secure_flag = 2
-    elif (args.memory == "hashing+encryption"): secure_flag = 3
-    elif ( args.memory == "full_security"): secure_flag = 7
-    elif ( args.memory == "no_security"): secure_flag = 0
-    else:
-      print(f"Incorrect memory module: {args.memory}")
-      exit
-
-    print(f"\nRunning memory module: {args.memory}\n  secure_flag: {secure_flag}\n\n")
-
     memory = ConfigurableMemory(
         size="16GiB",
         latency=args.encryption_latency,
@@ -289,9 +306,6 @@ else: # Any kind of configurable memory uses the configurable module
         cache_mac=args.cache_mac,
         eager_fetch=args.eager_fetch,
         bonsai=not args.no_bonsai,
-        secure=secure_flag,
-        #l3_cache_size=args.l3_size,
-        #protocol=args.mcx_policy,
     )
 
 
@@ -329,60 +343,144 @@ board = RiscvBoard(
 
 # micro-benchmark command
 if (args.benchmark == "microbenchmark"):
-    #command = (
-    #    f"cd;"
-    #    f"cd repos/microbenchmark;"
-    #    f"./bin/micro 500000000 536870900 > tmp/bg_out.log 2>&1 &;" # background process w/ '&' operator 
-    #    f"BG_PID=$!;"
-    #    f"./bin/micro 500000000 536870900 > tmp/fg_out.log 2>&1;" # 500 million accesses on approximately 8GB
-    #    f"wait $BG_PID;" # wait on background process
-    #    f"sleep 5;"
-    #    f"m5 exit;"
-    #)
-    command = """
-      cd ~/repos/microbenchmark
-      mkdir -p tmp
-      ./bin/micro 500000000 536870900 > tmp/bg_out.log 2>&1 &
-      BG_PID=$!
-      ./bin/micro 500000000 536870900 > tmp/fg_out.log 2>&1
-      wait $BG_PID
-      sleep 5
-      m5 exit
-    """
-else:
-# parsec command
     command = (
-        f"cd /home/gem5/parsec-benchmark;"
-        + "source env.sh;"
-        + f"parsecmgmt -a run -p {args.benchmark} -c gcc-hooks -i {args.size}         -n 4;"
-        + "sleep 5;"
-        + "m5 exit;"
+        f"cd;"
+        f"cd repos/microbenchmark;"
+        f"./bin/micro 500000000 536870900;"  
+        f"sleep 5;"
+        f"m5 exit;"
     )
+    #command = """
+    #  cd ~/repos/microbenchmark
+    #  mkdir -p tmp
+    #  ./bin/micro 500000000 536870900 > tmp/bg_out.log 2>&1 & 
+    #  BG_PID=$!
+    #  ./bin/micro 500000000 536870900 > tmp/fg_out.log 2>&1
+    #  wait $BG_PID
+    #  sleep 5
+    #  m5 exit
+    #""" # background process w/ '&' operator
+else:
+    bmarks = [args.benchmark]
+    if args.benchmark2:
+        bmarks.append(args.benchmark2)
+    if args.benchmark3:
+        bmarks.append(args.benchmark2)
+    if args.benchmark4:
+        bmarks.append(args.benchmark2)
+
+
+
+    payloads = {}
+    guest_args_map = {}
+    bm_types = {}  # Tracks whether the benchmark is an 'app' or 'kernel' for the tar extraction
+
+    hostname = gethostname()
+    PARSEC_DIR = "/home/wbuziak/repos/gem5/parsec-benchmark"
+
+    for bm in bmarks:
+        # 1. Define potential paths based on the host
+        if "iris-arm-server" in hostname:
+            app_path = os.path.join(PARSEC_DIR, "pkgs", "apps", bm, "inst", "aarch64-linux.riscv-hooks", "bin", bm)
+            kernel_path = os.path.join(PARSEC_DIR, "pkgs", "kernels", bm, "inst", "aarch64-linux.riscv-hooks", "bin", bm)
+        else:
+            # Fallback for standard environments
+            app_path = os.path.join(PARSEC_DIR, "pkgs", "apps", bm, "inst", "amd64-linux.gcc", "bin", bm)
+            kernel_path = os.path.join(PARSEC_DIR, "pkgs", "kernels", bm, "inst", "amd64-linux.gcc", "bin", bm)
+
+        # 2. Check both apps and kernels directories to set WORKLOAD_PATH and bm_types
+        if os.path.isfile(app_path):
+            WORKLOAD_PATH = app_path
+            bm_types[bm] = "apps"
+        elif os.path.isfile(kernel_path):
+            WORKLOAD_PATH = kernel_path
+            bm_types[bm] = "kernels"
+        else:
+            print(f"Host binary not found for {bm}. Checked:\n - {app_path}\n - {kernel_path}")
+            sys.exit(1)
+
+        # 3. Base64 Encode
+        with open(WORKLOAD_PATH, "rb") as f:
+            payloads[bm] = base64.b64encode(f.read()).decode("ascii")
+
+        # 4. Setup arguments based on the specific benchmark
+        if bm == "blackscholes":
+            input_map = {"simsmall": "in_4K.txt", "simmedium": "in_16K.txt", "simlarge": "in_64K.txt"}
+            input_file = input_map.get(args.size, "in_4K.txt")
+            guest_args_map[bm] = f"4 {input_file} prices.txt"
+
+        elif bm == "streamcluster":
+            input_map = {
+                "simsmall": "10 20 32 4096 4096 1000 none output.txt 4",
+                "simmedium": "10 20 64 8192 8192 1000 none output.txt 4",
+                "simlarge": "10 20 128 16384 16384 1000 none output.txt 4"
+            }
+            guest_args_map[bm] = input_map.get(args.size, "10 20 32 4096 4096 1000 none output.txt 4")
+
+        elif bm == "dedup":
+            # args: -c (compress) -p (profiling) -v (verbose) -t <threads> -i <infile> -o <outfile>
+            # PARSEC's input_*.tar extracts 'media.dat' for all sizes; only the file size changes.
+            guest_args_map[bm] = "-c -p -v -t 4 -i media.dat -o output.dat.ddp"
+
+        elif bm == "fluidanimate":
+            input_map = {
+                "test": "in_5K.fluid",
+                "simsmall": "in_35K.fluid",
+                "simmedium": "in_100K.fluid",
+                "simlarge": "in_300K.fluid",
+                "native": "in_500K.fluid",
+            }
+            input_file = input_map.get(args.size, "in_35K.fluid")
+            frames = "1" if args.size == "test" else "5"
+            # Syntax: <threads> <frames> <input.fluid> <output.fluid>
+            guest_args_map[bm] = f"4 {frames} {input_file} out.fluid"
+        else:
+            guest_args_map[bm] = "4" # Fallback
+
+    # 5. Construct Guest Execution Command
+    command = "echo 'Boot complete, updating binaries!'\n"
+
+    # Unpack both binaries
+    for i, bm in enumerate(bmarks):
+        bm_type = bm_types.get(bm, "apps") # Dynamically inject 'apps' or 'kernels'
+        command += (
+            f"mkdir -p /root/run_{bm}\n"
+            f"cd /root/run_{bm}\n"
+            f"tar -xf {PARSEC_DIR}/pkgs/{bm_type}/{bm}/inputs/input_{args.size}.tar\n"
+            f"/root/exec_{bm} {guest_args_map[bm]} > /root/run_{bm}/{bm}.log 2>&1 &\n"
+            f"PID{i}=$!\n"
+        )
+
+    # Wait for both to finish
+    for i in range(len(bmarks)):
+        command += f"wait $PID{i}\n"
+
+    # Print each log file sequentially to system.terminal
+    for bm in bmarks:
+        command += (
+            f"echo '========================================'\n"
+            f"echo ' Output for {bm}'\n"
+            f"echo '========================================'\n"
+            f"cat /root/run_{bm}/{bm}.log\n"
+        )
+
+    command += "echo 'All benchmarks exited'\nm5 exit\n" 
 
 board.set_kernel_disk_workload(
-    bootloader=BootloaderResource(
-        local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"
-    ),
-    kernel=KernelResource(
-        local_path=os.getcwd() + "/fs_files/linux-6.5.5"
-    ),
-    # The x86-parsec image will be automatically downloaded to the
-    # `~/.cache/gem5` directory if not already present.
-    disk_image=DiskImageResource(
-        local_path=os.getcwd() + "/fs_files/riscv-ubuntu-22.04"
-    ),
+    bootloader=BootloaderResource(local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"),
+    kernel=KernelResource(local_path=os.getcwd() + "/fs_files/linux-6.5.5"),
+    disk_image=DiskImageResource(local_path=os.getcwd() + "/fs_files/riscv-ubuntu-22.04"),
     readfile_contents=command,
-)
+) 
 
 # functions to handle different exit events during the simuation
 def handle_workbegin():
     print("Done booting Linux")
     print("Resetting stats at the start of ROI!")
-    m5.stats.reset()
     processor.switch()
+    m5.stats.reset()
     simulator.schedule_max_insts(125000000) # 500 million instructions
     yield False
-
 
 def handle_workend():
     print()
@@ -392,17 +490,31 @@ def handle_workend():
     print()
     yield True
 
+def handle_exit():
+    print("Done booting Linux")
+    print("Resetting stats at the start of ROI!")
+    processor.switch()
+    m5.stats.reset()
+    simulator.schedule_max_insts(125000000) # 500 million instructions
+    yield False
+
 def handle_max_insts():
-    print()
-    print("Maximum instructions reached")
-    print("Dump stats at the end of the ROI!")
+    print("\n[Warmup Complete] Resetting stats for actual measurement phase...")
+    m5.stats.reset()
+    
+    # Schedule end of Measurement (500 million instructions)
+    simulator.schedule_max_insts(500000000)
+    yield False  # Resume simulation for ROI measurement
+
+    # Triggered when Measurement finishes
+    print("\n[Measurement Complete] Dumping stats at end of ROI!")
     m5.stats.dump()
-    print()
     yield True
 
 simulator = Simulator(
     board=board,
     on_exit_event={
+        ExitEvent.EXIT: handle_exit(),
         ExitEvent.WORKBEGIN: handle_workbegin(),
         ExitEvent.WORKEND: handle_workend(),
         ExitEvent.MAX_INSTS: handle_max_insts(),
