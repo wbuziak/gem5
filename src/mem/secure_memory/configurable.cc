@@ -114,8 +114,8 @@ Configurable::startup()
     // Set security mode manually
 
     for (i = 0; i < epmpTable.pmpEntries.size(); i++) {
-        index = i % 5;
-        if (index == 4) index = 7; 
+        // index = i % 5;
+        // if (index == 4) index = 7; 
           /*
             index = 0: no security          000
             index = 1: hashing only         001
@@ -123,7 +123,8 @@ Configurable::startup()
             index = 3: hashing + encryption 011
             index = 7: full security        111
           */
-        epmpTable.pmpEntries[i].security = index; // set security flag
+        //epmpTable.pmpEntries[i].security = index; // set security flag
+        epmpTable.pmpEntries[i].security = 1; // set security flag
     }
 
     // Hit rate for deciding when to change security
