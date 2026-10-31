@@ -1,0 +1,13 @@
+echo 'Boot complete, updating binaries!'
+mkdir -p /root/run_dedup
+cd /root/run_dedup
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/kernels/dedup/inputs/input_simlarge.tar
+/root/exec_dedup -c -p -v -t 4 -i media.dat -o output.dat.ddp > /root/run_dedup/dedup.log 2>&1 &
+PID0=$!
+wait $PID0
+echo '========================================'
+echo ' Output for dedup'
+echo '========================================'
+cat /root/run_dedup/dedup.log
+echo 'All benchmarks exited'
+m5 exit
