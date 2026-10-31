@@ -503,7 +503,7 @@ def handle_max_insts():
     m5.stats.reset()
     
     # Schedule end of Measurement (500 million instructions)
-    simulator.schedule_max_insts(500000000)
+    simulator.schedule_max_insts(125000000)
     yield False  # Resume simulation for ROI measurement
 
     # Triggered when Measurement finishes
