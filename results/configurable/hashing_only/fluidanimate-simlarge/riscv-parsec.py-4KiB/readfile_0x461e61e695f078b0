@@ -1,0 +1,13 @@
+echo 'Boot complete, updating binaries!'
+mkdir -p /root/run_fluidanimate
+cd /root/run_fluidanimate
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/apps/fluidanimate/inputs/input_simlarge.tar
+/root/exec_fluidanimate 4 5 in_300K.fluid out.fluid > /root/run_fluidanimate/fluidanimate.log 2>&1 &
+PID0=$!
+wait $PID0
+echo '========================================'
+echo ' Output for fluidanimate'
+echo '========================================'
+cat /root/run_fluidanimate/fluidanimate.log
+echo 'All benchmarks exited'
+m5 exit

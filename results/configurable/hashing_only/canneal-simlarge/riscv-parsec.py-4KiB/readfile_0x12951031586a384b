@@ -1,0 +1,13 @@
+echo 'Boot complete, updating binaries!'
+mkdir -p /root/run_canneal
+cd /root/run_canneal
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/kernels/canneal/inputs/input_simlarge.tar
+/root/exec_canneal 4 > /root/run_canneal/canneal.log 2>&1 &
+PID0=$!
+wait $PID0
+echo '========================================'
+echo ' Output for canneal'
+echo '========================================'
+cat /root/run_canneal/canneal.log
+echo 'All benchmarks exited'
+m5 exit
