@@ -1,0 +1,43 @@
+echo 'Boot complete, updating binaries!'
+mkdir -p /root/run_blackscholes
+cd /root/run_blackscholes
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/apps/blackscholes/inputs/input_simlarge.tar
+/root/exec_blackscholes 4 in_64K.txt prices.txt > /root/run_blackscholes/blackscholes.log 2>&1 &
+PID0=$!
+mkdir -p /root/run_canneal
+cd /root/run_canneal
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/kernels/canneal/inputs/input_simlarge.tar
+/root/exec_canneal 4 > /root/run_canneal/canneal.log 2>&1 &
+PID1=$!
+mkdir -p /root/run_canneal
+cd /root/run_canneal
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/kernels/canneal/inputs/input_simlarge.tar
+/root/exec_canneal 4 > /root/run_canneal/canneal.log 2>&1 &
+PID2=$!
+mkdir -p /root/run_canneal
+cd /root/run_canneal
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/kernels/canneal/inputs/input_simlarge.tar
+/root/exec_canneal 4 > /root/run_canneal/canneal.log 2>&1 &
+PID3=$!
+wait $PID0
+wait $PID1
+wait $PID2
+wait $PID3
+echo '========================================'
+echo ' Output for blackscholes'
+echo '========================================'
+cat /root/run_blackscholes/blackscholes.log
+echo '========================================'
+echo ' Output for canneal'
+echo '========================================'
+cat /root/run_canneal/canneal.log
+echo '========================================'
+echo ' Output for canneal'
+echo '========================================'
+cat /root/run_canneal/canneal.log
+echo '========================================'
+echo ' Output for canneal'
+echo '========================================'
+cat /root/run_canneal/canneal.log
+echo 'All benchmarks exited'
+m5 exit
