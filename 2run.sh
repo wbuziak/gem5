@@ -10,7 +10,7 @@ export MEMORY=$6
 export CONFIG=$7 # architecture / name / mem-module we are testing (config file)
 
 # redirect the stats to a folder with the following naming convention
-RESULTS_DIR=$CUR_DIR/results/$NAME/$MEMORY/$BMK-$SIZE/$CONFIG-$META_SIZE
+RESULTS_DIR=$CUR_DIR/results/$NAME/$MEMORY/$BMK-$BMK2/$CONFIG-$META_SIZE
 
 ./build/RISCV/gem5.opt -d $RESULTS_DIR configs/example/gem5_library/$CONFIG --benchmark $BMK --benchmark2 $BMK2 --size $SIZE --metadata_cache_size $META_SIZE --memory configurable --l3_size 256KiB --mcx_policy never 2>&1 | tee $RESULTS_DIR/output.txt
 
