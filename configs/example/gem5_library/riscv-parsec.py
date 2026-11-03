@@ -160,14 +160,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--memory2",
-    type=str,
-    required=False,
-    help="Which security protocol for 2nd benchmark.",
-    choices=memory_choices,
-)
-
-parser.add_argument(
     "--size",
     type=str,
     required=True,
