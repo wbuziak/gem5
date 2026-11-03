@@ -1,0 +1,13 @@
+echo 'Boot complete, updating binaries!'
+mkdir -p /root/run_blackscholes
+cd /root/run_blackscholes
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/apps/blackscholes/inputs/input_simlarge.tar
+/root/exec_blackscholes 4 in_64K.txt prices.txt > /root/run_blackscholes/blackscholes.log 2>&1 &
+PID0=$!
+wait $PID0
+echo '========================================'
+echo ' Output for blackscholes'
+echo '========================================'
+cat /root/run_blackscholes/blackscholes.log
+echo 'All benchmarks exited'
+m5 exit
