@@ -1,0 +1,13 @@
+echo 'Boot complete, updating binaries!'
+mkdir -p /root/run_streamcluster
+cd /root/run_streamcluster
+tar -xf /home/wbuziak/repos/gem5/parsec-benchmark/pkgs/kernels/streamcluster/inputs/input_simlarge.tar
+/root/exec_streamcluster 10 20 128 16384 16384 1000 none output.txt 4 > /root/run_streamcluster/streamcluster.log 2>&1 &
+PID0=$!
+wait $PID0
+echo '========================================'
+echo ' Output for streamcluster'
+echo '========================================'
+cat /root/run_streamcluster/streamcluster.log
+echo 'All benchmarks exited'
+m5 exit
