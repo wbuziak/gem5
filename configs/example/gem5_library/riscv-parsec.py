@@ -160,14 +160,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--memory2",
-    type=str,
-    required=False,
-    help="Which security protocol for 2nd benchmark.",
-    choices=memory_choices,
-)
-
-parser.add_argument(
     "--size",
     type=str,
     required=True,
@@ -503,7 +495,7 @@ def handle_max_insts():
     m5.stats.reset()
     
     # Schedule end of Measurement (500 million instructions)
-    simulator.schedule_max_insts(500000000)
+    simulator.schedule_max_insts(125000000)
     yield False  # Resume simulation for ROI measurement
 
     # Triggered when Measurement finishes
