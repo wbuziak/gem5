@@ -364,6 +364,7 @@ else:
 
 
     payloads = {}
+    input_payloads = {}  # Add a dictionary to store the base64 encoded input tarballs
     guest_args_map = {}
     bm_types = {}  # Tracks whether the benchmark is an 'app' or 'kernel' for the tar extraction
 
@@ -391,11 +392,20 @@ else:
             print(f"Host binary not found for {bm}. Checked:\n - {app_path}\n - {kernel_path}")
             sys.exit(1)
 
-        # 3. Base64 Encode
+        # 3. Base64 Encode the binary
         with open(WORKLOAD_PATH, "rb") as f:
             payloads[bm] = base64.b64encode(f.read()).decode("ascii")
 
-        # 4. Setup arguments based on the specific benchmark
+        # 4. Base64 Encode the input tarball
+        input_tar_path = os.path.join(PARSEC_DIR, "pkgs", bm_types[bm], bm, "inputs", f"input_{args.size}.tar")
+        if os.path.isfile(input_tar_path):
+            with open(input_tar_path, "rb") as f:
+                input_payloads[bm] = base64.b64encode(f.read()).decode("ascii")
+        else:
+            print(f"Host input tarball not found for {bm}. Checked:\n - {input_tar_path}")
+            sys.exit(1)
+
+        # 5. Setup arguments based on the specific benchmark
         if bm == "blackscholes":
             input_map = {"simsmall": "in_4K.txt", "simmedium": "in_16K.txt", "simlarge": "in_64K.txt"}
             input_file = input_map.get(args.size, "in_4K.txt")
@@ -410,7 +420,7 @@ else:
             guest_args_map[bm] = input_map.get(args.size, "10 20 32 4096 4096 1000 none output.txt 4")
 
         elif bm == "dedup":
-            # args: -c (compress) -p (profiling) -v (verbose) -t <threads> -i <infile> -o <outfile>
+            # args: -c (compress) -p (profiling) -v (verbose) -t <threads> - i <infile> -o <outfile>
             # PARSEC's input_*.tar extracts 'media.dat' for all sizes; only the file size changes.
             guest_args_map[bm] = "-c -p -v -t 4 -i media.dat -o output.dat.ddp"
 
@@ -429,19 +439,23 @@ else:
         else:
             guest_args_map[bm] = "4" # Fallback
 
-    # 5. Construct Guest Execution Command
+    # 6. Construct Guest Execution Command
     command = "echo 'Boot complete, updating binaries!'\n"
 
-    # Unpack both binaries
     for i, bm in enumerate(bmarks):
-        bm_type = bm_types.get(bm, "apps") # Dynamically inject 'apps' or 'kernels'
+        # 1. Decode base64 binary payload directly into the guest filesystem
+        command += f"echo '{payloads[bm]}' | base64 -d > /root/exec_{bm}\n"
+        command += f"chmod +x /root/exec_{bm}\n"
+
+        # 2. Decode the base64 input tarball and extract it
         command += (
             f"mkdir -p /root/run_{bm}\n"
             f"cd /root/run_{bm}\n"
-            f"tar -xf {PARSEC_DIR}/pkgs/{bm_type}/{bm}/inputs/input_{args.size}.tar\n"
+            f"echo '{input_payloads[bm]}' | base64 -d > /root/run_{bm}/input_{args.size}.tar\n"
+            f"tar -xf /root/run_{bm}/input_{args.size}.tar\n"
             f"/root/exec_{bm} {guest_args_map[bm]} > /root/run_{bm}/{bm}.log 2>&1 &\n"
             f"PID{i}=$!\n"
-        )
+        ) 
 
     # Wait for both to finish
     for i in range(len(bmarks)):
@@ -491,6 +505,13 @@ def handle_exit():
     yield False
 
 def handle_max_insts():
+    print("\n[Warmup Complete] Resetting stats for actual measurement phase...")
+    m5.stats.reset()
+    
+    # Schedule end of Measurement (500 million instructions)
+    simulator.schedule_max_insts(125000000)
+    yield False  # Resume simulation for ROI measurement 
+
     # Triggered when Measurement finishes
     print("\n[Measurement Complete] Dumping stats at end of ROI!")
     m5.stats.dump()
