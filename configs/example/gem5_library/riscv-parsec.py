@@ -431,11 +431,8 @@ else:
         else:
             guest_args_map[bm] = "4" # Fallback
 
-        #  Construct Guest Execution Command
+       # Construct Guest Execution Command
         command = "echo 'Boot complete, updating binaries!'\n"
-
-        # NOTE: The libhooks.so base64 injection block was completely removed 
-        # here since we successfully transitioned to static binaries.
 
         for i, bm in enumerate(bmarks):
             bm_type = bm_types.get(bm, "apps")
@@ -450,30 +447,33 @@ else:
                 print(f"Warning: Input tarball not found for {bm} at {input_tar_path}")
                 tar_b64 = ""
 
-            # 2. Write binary base64 payload to target location on guest
+            # 2. Setup run directory and write/decode binary (deleting b64 immediately)
             command += (
-                f"cat << 'EOF' > /root/exec_{bm}.b64\n"
-                f"{payloads[bm]}\n"
-                f"EOF\n"
-                f"base64 -d /root/exec_{bm}.b64 > /root/exec_{bm}\n"
-                f"chmod +x /root/exec_{bm}\n"
                 f"mkdir -p /root/run_{bm}\n"
                 f"cd /root/run_{bm}\n"
+                f"cat << 'EOF' > /root/run_{bm}/exec_{bm}.b64\n"
+                f"{payloads[bm]}\n"
+                f"EOF\n"
+                f"base64 -d /root/run_{bm}/exec_{bm}.b64 > /root/run_{bm}/exec_{bm}\n"
+                f"rm -f /root/run_{bm}/exec_{bm}.b64\n"
+                f"chmod +x /root/run_{bm}/exec_{bm}\n"
             )
 
-            # 3. Inject and extract the input tarball into the guest run directory
+        # Inject, extract, and clean up the input tarball
             if tar_b64:
                 command += (
                     f"cat << 'EOF' > /root/run_{bm}/input.tar.b64\n"
                     f"{tar_b64}\n"
                     f"EOF\n"
-                    f"base64 -d /root/run_{bm}/input.tar.b64 > input.tar\n"
-                    f"tar -xf input.tar\n"
+                    f"base64 -d /root/run_{bm}/input.tar.b64 > input.tar || true\n"
+                    f"rm -f /root/run_{bm}/input.tar.b64 || true\n"
+                    f"tar -m -xf input.tar || true\n"
+                    f"rm -f input.tar || true\n"
                 )
 
             # 4. Execute the benchmark in the background
             command += (
-                f"/root/exec_{bm} {guest_args_map[bm]} > /root/run_{bm}/{bm}.log 2>&1 &\n"
+                f"/root/run_{bm}/exec_{bm} {guest_args_map[bm]} > /root/run_{bm}/{bm}.log 2>&1 &\n"
                 f"PID{i}=$!\n"
             )
 
@@ -489,8 +489,6 @@ else:
                 f"echo '========================================'\n"
                 f"cat /root/run_{bm}/{bm}.log\n"
             )
-
-        command += "echo 'All benchmarks exited'\nm5 exit\n" 
 
 board.set_kernel_disk_workload(
     bootloader=BootloaderResource(local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"),
