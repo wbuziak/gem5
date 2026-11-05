@@ -357,14 +357,13 @@ else:
     if args.benchmark2:
         bmarks.append(args.benchmark2)
     if args.benchmark3:
-        bmarks.append(args.benchmark2)
+        bmarks.append(args.benchmark3)
     if args.benchmark4:
-        bmarks.append(args.benchmark2)
+        bmarks.append(args.benchmark4)
 
 
 
     payloads = {}
-    input_payloads = {}  # Add a dictionary to store the base64 encoded input tarballs
     guest_args_map = {}
     bm_types = {}  # Tracks whether the benchmark is an 'app' or 'kernel' for the tar extraction
 
@@ -392,20 +391,11 @@ else:
             print(f"Host binary not found for {bm}. Checked:\n - {app_path}\n - {kernel_path}")
             sys.exit(1)
 
-        # 3. Base64 Encode the binary
+        # 3. Base64 Encode
         with open(WORKLOAD_PATH, "rb") as f:
             payloads[bm] = base64.b64encode(f.read()).decode("ascii")
 
-        # 4. Base64 Encode the input tarball
-        input_tar_path = os.path.join(PARSEC_DIR, "pkgs", bm_types[bm], bm, "inputs", f"input_{args.size}.tar")
-        if os.path.isfile(input_tar_path):
-            with open(input_tar_path, "rb") as f:
-                input_payloads[bm] = base64.b64encode(f.read()).decode("ascii")
-        else:
-            print(f"Host input tarball not found for {bm}. Checked:\n - {input_tar_path}")
-            sys.exit(1)
-
-        # 5. Setup arguments based on the specific benchmark
+        # 4. Setup arguments based on the specific benchmark
         if bm == "blackscholes":
             input_map = {"simsmall": "in_4K.txt", "simmedium": "in_16K.txt", "simlarge": "in_64K.txt"}
             input_file = input_map.get(args.size, "in_4K.txt")
@@ -420,9 +410,11 @@ else:
             guest_args_map[bm] = input_map.get(args.size, "10 20 32 4096 4096 1000 none output.txt 4")
 
         elif bm == "dedup":
-            # args: -c (compress) -p (profiling) -v (verbose) -t <threads> - i <infile> -o <outfile>
+            # args: -c (compress) -p (profiling) -v (verbose) -t <threads> -i <infile> -o <outfile>
             # PARSEC's input_*.tar extracts 'media.dat' for all sizes; only the file size changes.
             guest_args_map[bm] = "-c -p -v -t 4 -i media.dat -o output.dat.ddp"
+        elif bm == "canneal":
+            guest_args_map[bm] = "4 10000 20000 10.nets 32" 
 
         elif bm == "fluidanimate":
             input_map = {
@@ -439,38 +431,66 @@ else:
         else:
             guest_args_map[bm] = "4" # Fallback
 
-    # 6. Construct Guest Execution Command
-    command = "echo 'Boot complete, updating binaries!'\n"
+        #  Construct Guest Execution Command
+        command = "echo 'Boot complete, updating binaries!'\n"
 
-    for i, bm in enumerate(bmarks):
-        # 1. Decode base64 binary payload directly into the guest filesystem
-        command += f"echo '{payloads[bm]}' | base64 -d > /root/exec_{bm}\n"
-        command += f"chmod +x /root/exec_{bm}\n"
+        # NOTE: The libhooks.so base64 injection block was completely removed 
+        # here since we successfully transitioned to static binaries.
 
-        # 2. Decode the base64 input tarball and extract it
-        command += (
-            f"mkdir -p /root/run_{bm}\n"
-            f"cd /root/run_{bm}\n"
-            f"echo '{input_payloads[bm]}' | base64 -d > /root/run_{bm}/input_{args.size}.tar\n"
-            f"tar -xf /root/run_{bm}/input_{args.size}.tar\n"
-            f"/root/exec_{bm} {guest_args_map[bm]} > /root/run_{bm}/{bm}.log 2>&1 &\n"
-            f"PID{i}=$!\n"
-        ) 
+        for i, bm in enumerate(bmarks):
+            bm_type = bm_types.get(bm, "apps")
 
-    # Wait for both to finish
-    for i in range(len(bmarks)):
-        command += f"wait $PID{i}\n"
+            # 1. Read and base64-encode the input tarball from the host
+            input_tar_path = os.path.join(PARSEC_DIR, "pkgs", bm_type, bm, "inputs", f"input_{args.size}.tar")
+        
+            if os.path.exists(input_tar_path):
+                with open(input_tar_path, "rb") as f:
+                    tar_b64 = base64.b64encode(f.read()).decode('ascii')
+            else:
+                print(f"Warning: Input tarball not found for {bm} at {input_tar_path}")
+                tar_b64 = ""
 
-    # Print each log file sequentially to system.terminal
-    for bm in bmarks:
-        command += (
-            f"echo '========================================'\n"
-            f"echo ' Output for {bm}'\n"
-            f"echo '========================================'\n"
-            f"cat /root/run_{bm}/{bm}.log\n"
-        )
+            # 2. Write binary base64 payload to target location on guest
+            command += (
+                f"cat << 'EOF' > /root/exec_{bm}.b64\n"
+                f"{payloads[bm]}\n"
+                f"EOF\n"
+                f"base64 -d /root/exec_{bm}.b64 > /root/exec_{bm}\n"
+                f"chmod +x /root/exec_{bm}\n"
+                f"mkdir -p /root/run_{bm}\n"
+                f"cd /root/run_{bm}\n"
+            )
 
-    command += "echo 'All benchmarks exited'\nm5 exit\n" 
+            # 3. Inject and extract the input tarball into the guest run directory
+            if tar_b64:
+                command += (
+                    f"cat << 'EOF' > /root/run_{bm}/input.tar.b64\n"
+                    f"{tar_b64}\n"
+                    f"EOF\n"
+                    f"base64 -d /root/run_{bm}/input.tar.b64 > input.tar\n"
+                    f"tar -xf input.tar\n"
+                )
+
+            # 4. Execute the benchmark in the background
+            command += (
+                f"/root/exec_{bm} {guest_args_map[bm]} > /root/run_{bm}/{bm}.log 2>&1 &\n"
+                f"PID{i}=$!\n"
+            )
+
+        # Wait for all background processes to finish
+        for i in range(len(bmarks)):
+            command += f"wait $PID{i}\n"
+
+        # Print each log file sequentially to system.terminal
+        for bm in bmarks:
+            command += (
+                f"echo '========================================'\n"
+                f"echo ' Output for {bm}'\n"
+                f"echo '========================================'\n"
+                f"cat /root/run_{bm}/{bm}.log\n"
+            )
+
+        command += "echo 'All benchmarks exited'\nm5 exit\n" 
 
 board.set_kernel_disk_workload(
     bootloader=BootloaderResource(local_path=os.getcwd() + "/fs_files/riscv-bootloader-opensbi-1.3.1"),
@@ -481,7 +501,7 @@ board.set_kernel_disk_workload(
 
 # functions to handle different exit events during the simuation
 def handle_workbegin():
-    print("Done booting Linux")
+    print("Done booting Linux - Beginning Benchmark")
     print("Resetting stats at the start of ROI!")
     processor.switch()
     m5.stats.reset()
@@ -497,11 +517,7 @@ def handle_workend():
     yield True
 
 def handle_exit():
-    print("Done booting Linux")
-    print("Resetting stats at the start of ROI!")
-    processor.switch()
-    m5.stats.reset()
-    simulator.schedule_max_insts(125000000) # 500 million instructions
+    print("Handle_exit - continuing in atomic mode to catch ROI")
     yield False
 
 def handle_max_insts():
@@ -509,7 +525,7 @@ def handle_max_insts():
     m5.stats.reset()
     
     # Schedule end of Measurement (500 million instructions)
-    simulator.schedule_max_insts(125000000)
+    simulator.schedule_max_insts(25000000)
     yield False  # Resume simulation for ROI measurement 
 
     # Triggered when Measurement finishes
